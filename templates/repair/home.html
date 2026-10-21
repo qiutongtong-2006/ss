@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}首页 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+    <div>
+        <span class="eyebrow">
+            {% if user.role == 'student' %}学生工作台{% elif user.role == 'manager' %}宿管工作台{% else %}维修工作台{% endif %}
+        </span>
+        <h1 class="page-title mt-1 mb-2">你好，{{ user.real_name|default:user.username }}</h1>
+        <p class="page-subtitle mb-0">今天是 {% now "Y年n月j日" %}，有什么需要处理的吗？</p>
+    </div>
+    <span class="muted-chip">当前角色 · {{ user.get_role_display }}</span>
+</div>
+
+{% if user.role == 'student' %}
+    <div class="row g-4">
+        <div class="col-md-6">
+            <a class="quick-card primary" href="{% url 'repair:submit_repair' %}">
+                <span class="quick-icon">报</span>
+                <span>
+                    <span class="quick-title d-block">提交报修</span>
+                    <span class="quick-text d-block">填写位置、联系方式和故障描述，上传现场照片。</span>
+                </span>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <div class="quick-card disabled">
+                <span class="quick-icon">查</span>
+                <span>
+                    <span class="quick-title d-block">我的报修</span>
+                    <span class="quick-text d-block">查看自己提交的工单和处理进度。</span>
+                    <span class="badge text-bg-light mt-2">迭代 2 上线</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card section-card mt-4">
+        <h2 class="section-title">报修流程</h2>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="p-3 rounded-3 bg-light h-100">
+                    <strong>1. 提交报修</strong>
+                    <p class="text-muted small mb-0 mt-1">填写楼栋、宿舍号和故障描述，上传现场照片。</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 rounded-3 bg-light h-100">
+                    <strong>2. 受理派单</strong>
+                    <p class="text-muted small mb-0 mt-1">宿管查看工单池，受理后派给维修人员。</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-3 rounded-3 bg-light h-100">
+                    <strong>3. 维修验收</strong>
+                    <p class="text-muted small mb-0 mt-1">维修完成后，学生确认结果并进行评价。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% elif user.role == 'manager' %}
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="quick-card disabled">
+                <span class="quick-icon">单</span>
+                <span>
+                    <span class="quick-title d-block">工单池</span>
+                    <span class="quick-text d-block">查看待受理工单，受理并派给维修人员。</span>
+                    <span class="badge text-bg-light mt-2">迭代 2 上线</span>
+                </span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="quick-card disabled">
+                <span class="quick-icon">统</span>
+                <span>
+                    <span class="quick-title d-block">统计报表</span>
+                    <span class="quick-text d-block">查看报修量、分类占比和完成率。</span>
+                    <span class="badge text-bg-light mt-2">迭代 6 视工期实现</span>
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="card section-card mt-4">
+        <h2 class="section-title">基础数据维护</h2>
+        <p class="text-muted small">楼栋、报修分类和用户账号目前通过 Django Admin 维护。</p>
+        <a class="btn btn-outline-primary" href="{% url 'admin:index' %}">进入管理后台</a>
+    </div>
+{% else %}
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="quick-card disabled">
+                <span class="quick-icon">修</span>
+                <span>
+                    <span class="quick-title d-block">我的维修任务</span>
+                    <span class="quick-text d-block">查看派给自己的工单，接单并填写维修记录。</span>
+                    <span class="badge text-bg-light mt-2">迭代 3 上线</span>
+                </span>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

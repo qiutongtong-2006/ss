@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}工单 {{ work_order.order_no }} · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4">
+    <div>
+        <span class="eyebrow">WORK ORDER</span>
+        <h1 class="page-title mt-1 mb-2">工单 {{ work_order.order_no }}</h1>
+        <p class="page-subtitle mb-0">提交于 {{ work_order.created_at|date:"Y年n月j日 H:i" }}</p>
+    </div>
+    <span class="badge text-bg-{{ work_order.status_color }} fs-6 px-3 py-2">
+        {{ work_order.get_status_display }}
+    </span>
+</div>
+
+{% if work_order.status_index >= 0 %}
+    <div class="card section-card mb-4">
+        <h2 class="section-title">处理进度</h2>
+        <div class="status-track">
+            <div class="status-step {% if work_order.status_index >= 0 %}done{% endif %}">待受理</div>
+            <div class="status-step {% if work_order.status_index >= 1 %}done{% endif %}">已派单</div>
+            <div class="status-step {% if work_order.status_index >= 2 %}done{% endif %}">维修中</div>
+            <div class="status-step {% if work_order.status_index >= 3 %}done{% endif %}">待验收</div>
+            <div class="status-step {% if work_order.status_index >= 4 %}done{% endif %}">已完成</div>
+        </div>
+    </div>
+{% else %}
+    <div class="alert alert-{{ work_order.status_color }}">
+        {{ work_order.get_status_display }}
+        {% if work_order.reject_reason %}：{{ work_order.reject_reason }}{% endif %}
+    </div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">报修信息</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">报修学生</span>
+                    <span class="info-value">{{ work_order.student.real_name|default:work_order.student.username }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">联系电话</span>
+                    <span class="info-value">{{ work_order.contact_phone }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">楼栋 / 宿舍号</span>
+                    <span class="info-value">{{ work_order.building.name }} {{ work_order.room_no }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">维修地址</span>
+                    <span class="info-value">{{ work_order.repair_address|default:"未填写具体位置" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">报修分类</span>
+                    <span class="info-value">{{ work_order.category.name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">入室授权</span>
+                    <span class="info-value">
+                        {% if work_order.allow_entry_without_student %}
+                            <span class="text-success">已授权</span>
+                        {% else %}
+                            <span class="text-warning">未授权，需先联系学生</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card section-card mb-4">
+            <h2 class="section-title">故障描述</h2>
+            <p class="mb-0">{{ work_order.description|linebreaksbr }}</p>
+        </div>
+
+        {% if work_order.remark %}
+            <div class="card section-card mb-4">
+                <h2 class="section-title">备注</h2>
+                <p class="mb-0">{{ work_order.remark|linebreaksbr }}</p>
+            </div>
+        {% endif %}
+
+        <div class="card section-card">
+            <h2 class="section-title">现场照片</h2>
+            <div class="photo-gallery">
+                {% for photo in work_order.images.all %}
+                    <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                        <img src="{{ photo.image.url }}" class="photo-thumb" alt="报修照片">
+                    </a>
+                {% empty %}
+                    <p class="text-muted mb-0">未上传现场照片。</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">处理信息</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">维修人员</span>
+                    <span class="info-value">{{ work_order.repairer.real_name|default:"待分配" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">受理时间</span>
+                    <span class="info-value">{{ work_order.accepted_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">派单时间</span>
+                    <span class="info-value">{{ work_order.assigned_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">完工时间</span>
+                    <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card section-card">
+            <h2 class="section-title">需要帮助？</h2>
+            <p class="text-muted small">如长时间未受理，请联系宿管并提供工单号。</p>
+            <a class="btn btn-outline-primary w-100" href="{% url 'repair:home' %}">返回首页</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

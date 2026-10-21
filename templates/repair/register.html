@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}学生注册 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="auth-layout">
+    <section class="auth-intro">
+        <span class="eyebrow">STUDENT SIGN UP</span>
+        <h1 class="mt-2 mb-3">先注册，<br>再提交第一条报修</h1>
+        <p>使用学号注册学生账号。维修人员和宿管账号由管理员统一创建，不开放自助注册。</p>
+        <ul class="auth-points">
+            <li>用户名就是学号，登录方便</li>
+            <li>注册后自动登录，直接进入学生首页</li>
+            <li>联系电话用于宿管约定上门时间</li>
+        </ul>
+    </section>
+
+    <section class="card auth-card">
+        <h2 class="h4 mb-1">学生注册</h2>
+        <p class="text-muted small mb-4">带星号的项目为必填项。</p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">
+                        {{ field.label }}{% if field.field.required %}<span class="text-danger"> *</span>{% endif %}
+                    </label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <div class="form-text">{{ field.help_text|safe }}</div>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="text-danger small mt-1">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+
+            <button class="btn btn-primary w-100" type="submit">注册并登录</button>
+        </form>
+
+        <p class="text-center text-muted small mt-4 mb-0">
+            已有账号？<a href="{% url 'repair:login' %}">直接登录</a>
+        </p>
+    </section>
+</div>
+{% endblock %}

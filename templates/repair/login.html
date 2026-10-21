@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}登录 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="auth-layout">
+    <section class="auth-intro">
+        <span class="eyebrow">DORM REPAIR</span>
+        <h1 class="mt-2 mb-3">报修一处提交，<br>进度全程可查</h1>
+        <p>学生在线提交宿舍故障，宿管集中受理派单，维修人员接单处理，完成后由学生验收评价。</p>
+        <ul class="auth-points">
+            <li>学号登录，随时查看处理进度</li>
+            <li>支持上传现场照片，描述更清楚</li>
+            <li>维修过程留痕，处理结果可追溯</li>
+        </ul>
+    </section>
+
+    <section class="card auth-card">
+        <h2 class="h4 mb-1">登录</h2>
+        <p class="text-muted small mb-4">学生使用学号登录，维修人员和宿管使用工号登录。</p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.username.id_for_label }}">学号 / 工号</label>
+                <input
+                    type="text"
+                    name="{{ form.username.name }}"
+                    id="{{ form.username.id_for_label }}"
+                    class="form-control"
+                    value="{{ form.username.value|default:'' }}"
+                    placeholder="请输入学号或工号"
+                    autofocus
+                    required
+                >
+                {% for error in form.username.errors %}
+                    <div class="text-danger small mt-1">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label" for="{{ form.password.id_for_label }}">密码</label>
+                <input
+                    type="password"
+                    name="{{ form.password.name }}"
+                    id="{{ form.password.id_for_label }}"
+                    class="form-control"
+                    placeholder="请输入密码"
+                    required
+                >
+                {% for error in form.password.errors %}
+                    <div class="text-danger small mt-1">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <button class="btn btn-primary w-100" type="submit">登录</button>
+        </form>
+
+        <p class="text-center text-muted small mt-4 mb-0">
+            还没有账号？<a href="{% url 'repair:register' %}">学生注册</a>
+        </p>
+    </section>
+</div>
+{% endblock %}

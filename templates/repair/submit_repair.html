@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}提交报修 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <span class="eyebrow">NEW REPAIR</span>
+    <h1 class="page-title mt-1 mb-2">提交报修</h1>
+    <p class="page-subtitle mb-0">请如实填写故障信息。提交后可在工单详情中查看处理进度。</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    <datalist id="building-options">
+        {% for building in building_options %}
+            <option value="{{ building.name }}"></option>
+        {% endfor %}
+    </datalist>
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="card section-card mb-4">
+        <h2 class="section-title">报修位置</h2>
+        <div class="row g-3">
+            {% include 'repair/_field.html' with field=form.building_name col_class='col-md-6' %}
+            {% include 'repair/_field.html' with field=form.room_no col_class='col-md-6' %}
+            {% include 'repair/_field.html' with field=form.repair_address col_class='col-12' %}
+        </div>
+    </div>
+
+    <div class="card section-card mb-4">
+        <h2 class="section-title">联系方式与分类</h2>
+        <div class="row g-3">
+            {% include 'repair/_field.html' with field=form.contact_phone col_class='col-md-6' %}
+            {% include 'repair/_field.html' with field=form.category col_class='col-md-6' %}
+        </div>
+    </div>
+
+    <div class="card section-card mb-4">
+        <h2 class="section-title">故障描述</h2>
+        {% include 'repair/_field.html' with field=form.description %}
+    </div>
+
+    <div class="card section-card mb-4">
+        <h2 class="section-title">现场照片</h2>
+        <p class="text-muted small">照片为选填，建议上传 1～3 张现场照片，便于维修人员判断故障。每张不超过 5 MB。</p>
+        {% include 'repair/_field.html' with field=form.images %}
+        <div class="row g-3 mt-1" id="photo-preview"></div>
+    </div>
+
+    <div class="card section-card mb-4">
+        <h2 class="section-title">补充说明</h2>
+        {% include 'repair/_field.html' with field=form.remark %}
+        <div class="form-check mt-3 p-3 rounded-3 bg-light">
+            {{ form.allow_entry_without_student }}
+            <label class="form-check-label fw-semibold" for="{{ form.allow_entry_without_student.id_for_label }}">
+                {{ form.allow_entry_without_student.label }}
+            </label>
+            {% if form.allow_entry_without_student.help_text %}
+                <div class="form-text">{{ form.allow_entry_without_student.help_text }}</div>
+            {% endif %}
+            {% for error in form.allow_entry_without_student.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="d-flex flex-column flex-sm-row gap-2">
+        <button class="btn btn-primary px-4" type="submit">提交报修</button>
+        <a class="btn btn-outline-secondary" href="{% url 'repair:home' %}">返回首页</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('{{ form.images.id_for_label }}');
+    const preview = document.getElementById('photo-preview');
+    if (!input || !preview) {
+        return;
+    }
+
+    input.addEventListener('change', () => {
+        preview.innerHTML = '';
+        Array.from(input.files).slice(0, 3).forEach((file) => {
+            if (!file.type.startsWith('image/')) {
+                return;
+            }
+            const wrapper = document.createElement('div');
+            wrapper.className = 'col-6 col-md-4 col-lg-3';
+
+            const image = document.createElement('img');
+            image.className = 'photo-thumb';
+            image.src = URL.createObjectURL(file);
+            image.alt = file.name;
+
+            wrapper.appendChild(image);
+            preview.appendChild(wrapper);
+        });
+    });
+});
+</script>
+{% endblock %}
