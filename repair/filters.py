@@ -17,10 +17,10 @@ class WorkOrderFilterForm(forms.Form):
         empty_label='全部楼栋',
     )
     category = forms.ModelChoiceField(
-        label='报修分类',
+        label='报修类别',
         required=False,
         queryset=RepairCategory.objects.none(),
-        empty_label='全部分类',
+        empty_label='全部类别',
     )
     q = forms.CharField(
         label='关键词',

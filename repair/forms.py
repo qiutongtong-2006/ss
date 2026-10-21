@@ -137,7 +137,7 @@ class WorkOrderSubmitForm(forms.ModelForm):
         ]
         labels = {
             'room_no': '房间号',
-            'category': '报修分类',
+            'category': '报修类别',
             'description': '故障描述',
         }
 
@@ -147,7 +147,7 @@ class WorkOrderSubmitForm(forms.ModelForm):
         if user and not self.is_bound:
             self.initial.setdefault('contact_phone', user.phone)
         self.fields['category'].queryset = RepairCategory.objects.filter(is_active=True)
-        self.fields['category'].empty_label = '请选择报修分类'
+        self.fields['category'].empty_label = '请选择报修类别'
         self.fields['category'].widget.attrs['class'] = 'form-select'
         self.fields['room_no'].widget.attrs.update(
             {'class': 'form-control', 'placeholder': '例如 302'}

@@ -332,6 +332,50 @@ body {
     gap: 0.8rem;
 }
 
+.photo-upload-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem 0.9rem;
+}
+
+.photo-upload-row .form-label {
+    color: var(--ink);
+}
+
+.photo-upload-field {
+    font-size: 0.9rem;
+}
+
+.photo-upload-field .form-label,
+.photo-upload-field input[type="file"] {
+    font-size: 0.9rem;
+}
+
+.entry-consent {
+    width: 100%;
+    max-width: 18rem;
+    margin-right: auto;
+    margin-left: auto;
+    padding: 0.8rem 1rem;
+    border: 1px solid #d7e8fb;
+    border-radius: 12px;
+    background: #f3f8ff;
+}
+
+.entry-consent .form-check-input {
+    accent-color: var(--brand);
+}
+
+.entry-consent .form-check-label {
+    font-size: 0.875rem;
+    line-height: 1.55;
+}
+
+.entry-consent .form-text {
+    font-size: 0.75rem;
+}
+
 .photo-thumb {
     width: 100%;
     aspect-ratio: 4 / 3;

@@ -22,38 +22,47 @@
     {% endif %}
 
     <div class="card section-card mb-4">
-        <h2 class="section-title">报修位置</h2>
+        <h2 class="section-title">报修信息</h2>
         <div class="row g-3">
-            {% include 'repair/_field.html' with field=form.building_name col_class='col-md-6' %}
-            {% include 'repair/_field.html' with field=form.room_no col_class='col-md-6' %}
-            {% include 'repair/_field.html' with field=form.repair_address col_class='col-12' %}
-        </div>
-    </div>
-
-    <div class="card section-card mb-4">
-        <h2 class="section-title">联系方式与分类</h2>
-        <div class="row g-3">
-            {% include 'repair/_field.html' with field=form.contact_phone col_class='col-md-6' %}
+            {% include 'repair/_field.html' with field=form.building_name col_class='col-md-4' %}
+            {% include 'repair/_field.html' with field=form.room_no col_class='col-md-4' %}
+            {% include 'repair/_field.html' with field=form.contact_phone col_class='col-md-4' %}
             {% include 'repair/_field.html' with field=form.category col_class='col-md-6' %}
+            {% include 'repair/_field.html' with field=form.repair_address col_class='col-md-6' %}
         </div>
     </div>
 
     <div class="card section-card mb-4">
         <h2 class="section-title">故障描述</h2>
-        {% include 'repair/_field.html' with field=form.description %}
+        <label class="visually-hidden" for="{{ form.description.id_for_label }}">故障描述</label>
+        {{ form.description }}
+        {% for error in form.description.errors %}
+            <div class="text-danger small mt-1">{{ error }}</div>
+        {% endfor %}
+
+        <div class="photo-upload-field mt-4">
+            <div class="photo-upload-row">
+                <label class="form-label mb-0" for="{{ form.images.id_for_label }}">
+                    {{ form.images.label }}
+                </label>
+                {{ form.images }}
+            </div>
+            {% if form.images.help_text %}
+                <div class="form-text">{{ form.images.help_text }}</div>
+            {% endif %}
+            {% for error in form.images.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+            {% endfor %}
+            <div class="row g-3 mt-1" id="photo-preview"></div>
+        </div>
     </div>
 
     <div class="card section-card mb-4">
-        <h2 class="section-title">现场照片</h2>
-        <p class="text-muted small">照片为选填，建议上传 1～3 张现场照片，便于维修人员判断故障。每张不超过 5 MB。</p>
-        {% include 'repair/_field.html' with field=form.images %}
-        <div class="row g-3 mt-1" id="photo-preview"></div>
-    </div>
-
-    <div class="card section-card mb-4">
-        <h2 class="section-title">补充说明</h2>
         {% include 'repair/_field.html' with field=form.remark %}
-        <div class="form-check mt-3 p-3 rounded-3 bg-light">
+    </div>
+
+    <div class="entry-consent mb-4">
+        <div class="form-check">
             {{ form.allow_entry_without_student }}
             <label class="form-check-label fw-semibold" for="{{ form.allow_entry_without_student.id_for_label }}">
                 {{ form.allow_entry_without_student.label }}
