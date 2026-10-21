@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Building, RepairCategory, User, WorkOrder, WorkOrderImage
+from .models import Building, RepairCategory, StatusLog, User, WorkOrder, WorkOrderImage
 
 
 @admin.register(User)
@@ -37,6 +37,14 @@ class WorkOrderImageInline(admin.TabularInline):
     readonly_fields = ('uploaded_at',)
 
 
+class StatusLogInline(admin.TabularInline):
+    model = StatusLog
+    extra = 0
+    can_delete = False
+    readonly_fields = ('from_status', 'to_status', 'operator', 'remark', 'created_at')
+    ordering = ('created_at',)
+
+
 @admin.register(WorkOrder)
 class WorkOrderAdmin(admin.ModelAdmin):
     list_display = (
@@ -62,4 +70,4 @@ class WorkOrderAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('order_no', 'created_at', 'updated_at')
     date_hierarchy = 'created_at'
-    inlines = [WorkOrderImageInline]
+    inlines = [WorkOrderImageInline, StatusLogInline]

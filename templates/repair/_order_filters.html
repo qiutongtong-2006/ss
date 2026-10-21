@@ -1,0 +1,32 @@
+<form method="get" class="card section-card mb-4">
+    <div class="row g-3 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label small" for="{{ filter_form.status.id_for_label }}">状态</label>
+            {{ filter_form.status }}
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small" for="{{ filter_form.building.id_for_label }}">楼栋</label>
+            {{ filter_form.building }}
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small" for="{{ filter_form.category.id_for_label }}">报修分类</label>
+            {{ filter_form.category }}
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label small" for="{{ filter_form.q.id_for_label }}">关键词</label>
+            {{ filter_form.q }}
+        </div>
+        <div class="col-12 col-md-3">
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary flex-fill" type="submit">筛选</button>
+                <a class="btn btn-outline-secondary flex-fill" href="{{ request.path }}">重置</a>
+            </div>
+        </div>
+    </div>
+
+    {% if filter_form.errors %}
+        <div class="alert alert-warning mt-3 mb-0 py-2 small">
+            筛选条件有误，已显示未筛选结果。请检查后重试。
+        </div>
+    {% endif %}
+</form>

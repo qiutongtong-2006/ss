@@ -2,11 +2,12 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import StudentRegistrationForm, WorkOrderSubmitForm
-from .models import Building, User, WorkOrder, WorkOrderImage
+from .models import Building, StatusLog, User, WorkOrder, WorkOrderImage
 
 
 def register(request):
@@ -53,9 +54,17 @@ def submit_repair(request):
             work_order = form.save(commit=False)
             work_order.student = request.user
             work_order.building = building
-            work_order.save()
-            for image in form.cleaned_data['images']:
-                WorkOrderImage.objects.create(work_order=work_order, image=image)
+            with transaction.atomic():
+                work_order.save()
+                for image in form.cleaned_data['images']:
+                    WorkOrderImage.objects.create(work_order=work_order, image=image)
+                StatusLog.objects.create(
+                    work_order=work_order,
+                    from_status='',
+                    to_status=WorkOrder.Status.PENDING,
+                    operator=request.user,
+                    remark='学生提交报修',
+                )
             messages.success(request, f'报修提交成功，工单号：{work_order.order_no}')
             return redirect('repair:work_order_detail', pk=work_order.pk)
     else:

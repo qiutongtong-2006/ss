@@ -125,6 +125,8 @@ class WorkOrder(models.Model):
         '宿舍无人时同意在宿管陪同下进入',
         default=False,
     )
+    contact_note = models.TextField('联系备注', blank=True, default='')
+    appointment_at = models.DateTimeField('约定上门时间', null=True, blank=True)
     status = models.CharField(
         '状态',
         max_length=20,
@@ -206,3 +208,42 @@ class WorkOrderImage(models.Model):
 
     def __str__(self):
         return f'{self.work_order.order_no} 的照片'
+
+
+class StatusLog(models.Model):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name='status_logs',
+        verbose_name='工单',
+    )
+    from_status = models.CharField(
+        '原状态',
+        max_length=20,
+        choices=WorkOrder.Status.choices,
+        blank=True,
+    )
+    to_status = models.CharField(
+        '新状态',
+        max_length=20,
+        choices=WorkOrder.Status.choices,
+    )
+    operator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='status_logs',
+        verbose_name='操作人',
+    )
+    remark = models.TextField('备注', blank=True, default='')
+    created_at = models.DateTimeField('操作时间', auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = '状态日志'
+        verbose_name_plural = '状态日志'
+
+    def __str__(self):
+        from_display = self.get_from_status_display() if self.from_status else '新建'
+        return f'{self.work_order.order_no}: {from_display} → {self.get_to_status_display()}'
