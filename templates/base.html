@@ -38,6 +38,12 @@
                     </li>
                 {% endif %}
                 {% if user.is_authenticated and user.is_staff %}
+                    {% if user.role == 'manager' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'manager_orders' %}active{% endif %}"
+                               href="{% url 'repair:manager_orders' %}">工单池</a>
+                        </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'admin:index' %}">管理后台</a>
                     </li>

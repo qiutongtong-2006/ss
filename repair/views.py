@@ -3,6 +3,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -55,6 +56,48 @@ def my_orders(request):
         {
             'work_orders': work_orders,
             'filter_form': filter_form,
+        },
+    )
+
+
+@login_required
+def manager_orders(request):
+    """宿管工单池，默认显示待受理工单。"""
+    if not (
+        request.user.role == User.Role.MANAGER
+        or request.user.is_superuser
+    ):
+        raise PermissionDenied('只有宿管可以查看工单池。')
+
+    params = request.GET.copy()
+    if not params:
+        params['status'] = WorkOrder.Status.PENDING
+
+    queryset = WorkOrder.objects.select_related(
+        'student',
+        'building',
+        'category',
+        'repairer',
+    )
+    work_orders, filter_form = filter_work_orders(queryset, params)
+    summary = WorkOrder.objects.aggregate(
+        total=Count('id'),
+        pending=Count('id', filter=Q(status=WorkOrder.Status.PENDING)),
+        assigned=Count('id', filter=Q(status=WorkOrder.Status.ASSIGNED)),
+        repairing=Count('id', filter=Q(status=WorkOrder.Status.REPAIRING)),
+        pending_acceptance=Count(
+            'id',
+            filter=Q(status=WorkOrder.Status.PENDING_ACCEPTANCE),
+        ),
+    )
+
+    return render(
+        request,
+        'repair/manager_orders.html',
+        {
+            'work_orders': work_orders,
+            'filter_form': filter_form,
+            'summary': summary,
         },
     )
 
