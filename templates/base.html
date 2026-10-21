@@ -33,7 +33,8 @@
                            href="{% url 'repair:submit_repair' %}">提交报修</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">我的报修</a>
+                        <a class="nav-link {% if request.resolver_match.url_name == 'my_orders' %}active{% endif %}"
+                           href="{% url 'repair:my_orders' %}">我的报修</a>
                     </li>
                 {% endif %}
                 {% if user.is_authenticated and user.is_staff %}

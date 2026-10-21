@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}我的报修 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero d-flex flex-column flex-sm-row justify-content-between align-items-sm-end gap-3">
+    <div>
+        <span class="eyebrow">MY ORDERS</span>
+        <h1 class="page-title mt-1 mb-2">我的报修</h1>
+        <p class="page-subtitle mb-0">查看自己提交的全部报修和最新处理状态。</p>
+    </div>
+    <a class="btn btn-primary" href="{% url 'repair:submit_repair' %}">提交新报修</a>
+</div>
+
+{% include 'repair/_order_filters.html' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="section-title mb-0">工单记录</h2>
+    <span class="text-muted small">共 {{ work_orders|length }} 条</span>
+</div>
+
+<div class="card section-card">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>工单号</th>
+                    <th>位置</th>
+                    <th>分类</th>
+                    <th>状态</th>
+                    <th>提交时间</th>
+                    <th class="text-end">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in work_orders %}
+                    <tr>
+                        <td><strong>{{ order.order_no }}</strong></td>
+                        <td>{{ order.building.name }} {{ order.room_no }}</td>
+                        <td>{{ order.category.name }}</td>
+                        <td>
+                            <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                        </td>
+                        <td class="text-muted">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{% url 'repair:work_order_detail' order.pk %}">查看详情</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="text-center py-5">
+                                <div class="quick-icon mx-auto mb-3">报</div>
+                                <h3 class="h6">还没有报修记录</h3>
+                                <p class="text-muted small mb-3">提交第一条报修后，你可以在这里查看处理进度。</p>
+                                <a class="btn btn-primary" href="{% url 'repair:submit_repair' %}">提交第一条报修</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

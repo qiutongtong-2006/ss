@@ -6,6 +6,7 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from .filters import filter_work_orders
 from .forms import StudentRegistrationForm, WorkOrderSubmitForm
 from .models import Building, StatusLog, User, WorkOrder, WorkOrderImage
 
@@ -34,6 +35,28 @@ def register(request):
 def home(request):
     """登录后的首页，按角色显示不同入口。"""
     return render(request, 'repair/home.html')
+
+
+@login_required
+def my_orders(request):
+    """学生查看自己的报修列表。"""
+    if request.user.role != User.Role.STUDENT:
+        raise PermissionDenied('只有学生可以查看“我的报修”。')
+
+    queryset = WorkOrder.objects.filter(student=request.user).select_related(
+        'building',
+        'category',
+        'repairer',
+    )
+    work_orders, filter_form = filter_work_orders(queryset, request.GET)
+    return render(
+        request,
+        'repair/my_orders.html',
+        {
+            'work_orders': work_orders,
+            'filter_form': filter_form,
+        },
+    )
 
 
 @login_required
