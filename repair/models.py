@@ -1,5 +1,9 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
+
+from .utils import normalize_building_name
 
 
 class User(AbstractUser):
@@ -26,4 +30,179 @@ class User(AbstractUser):
     def __str__(self):
         return f'{self.real_name or self.username}（{self.get_role_display()}）'
 
-# Create your models here.
+
+class Building(models.Model):
+    name = models.CharField('楼栋名称', max_length=50, unique=True)
+    is_active = models.BooleanField('启用', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = '楼栋'
+        verbose_name_plural = '楼栋'
+
+    def clean(self):
+        super().clean()
+        self.name = normalize_building_name(self.name)
+        if (
+            self.name
+            and Building.objects.filter(name__iexact=self.name)
+            .exclude(pk=self.pk)
+            .exists()
+        ):
+            raise ValidationError({'name': '该楼栋已存在（已按统一写法匹配）。'})
+
+    def save(self, *args, **kwargs):
+        self.name = normalize_building_name(self.name)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+
+class RepairCategory(models.Model):
+    name = models.CharField('分类名称', max_length=50, unique=True)
+    description = models.CharField('说明', max_length=200, blank=True)
+    is_active = models.BooleanField('启用', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = '报修分类'
+        verbose_name_plural = '报修分类'
+
+    def __str__(self):
+        return self.name
+
+
+def generate_order_no():
+    """生成 BX + 日期 + 四位序号 的工单号。"""
+    date_part = timezone.localdate().strftime('%Y%m%d')
+    prefix = f'BX{date_part}'
+    last_order = (
+        WorkOrder.objects.filter(order_no__startswith=prefix)
+        .order_by('-order_no')
+        .first()
+    )
+    sequence = int(last_order.order_no[-4:]) + 1 if last_order else 1
+    return f'{prefix}{sequence:04d}'
+
+
+class WorkOrder(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', '待受理'
+        ASSIGNED = 'assigned', '已派单'
+        REPAIRING = 'repairing', '维修中'
+        PENDING_ACCEPTANCE = 'pending_acceptance', '待验收'
+        COMPLETED = 'completed', '已完成'
+        REJECTED = 'rejected', '已驳回'
+        CANCELLED = 'cancelled', '已撤销'
+
+    order_no = models.CharField('工单号', max_length=20, unique=True, editable=False)
+    student = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='work_orders',
+        verbose_name='报修学生',
+        limit_choices_to={'role': 'student'},
+    )
+    building = models.ForeignKey(
+        Building,
+        on_delete=models.PROTECT,
+        verbose_name='楼栋',
+    )
+    room_no = models.CharField('房间号', max_length=20)
+    repair_address = models.CharField('维修地址', max_length=200, blank=True)
+    contact_phone = models.CharField('联系电话', max_length=20, default='')
+    category = models.ForeignKey(
+        RepairCategory,
+        on_delete=models.PROTECT,
+        verbose_name='报修分类',
+    )
+    description = models.TextField('故障描述')
+    remark = models.TextField('备注', max_length=500, blank=True, default='')
+    allow_entry_without_student = models.BooleanField(
+        '宿舍无人时同意在宿管陪同下进入',
+        default=False,
+    )
+    status = models.CharField(
+        '状态',
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    repairer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_work_orders',
+        verbose_name='维修人员',
+        limit_choices_to={'role': 'repairer'},
+    )
+    accepted_at = models.DateTimeField('受理时间', null=True, blank=True)
+    assigned_at = models.DateTimeField('派单时间', null=True, blank=True)
+    started_at = models.DateTimeField('开始维修时间', null=True, blank=True)
+    completed_at = models.DateTimeField('完工时间', null=True, blank=True)
+    verified_at = models.DateTimeField('验收时间', null=True, blank=True)
+    reject_reason = models.TextField('驳回原因', blank=True)
+    cancel_reason = models.TextField('撤销原因', blank=True)
+    created_at = models.DateTimeField('提交时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = '报修工单'
+        verbose_name_plural = '报修工单'
+
+    def __str__(self):
+        return f'{self.order_no} - {self.get_status_display()}'
+
+    def save(self, *args, **kwargs):
+        if not self.order_no:
+            self.order_no = generate_order_no()
+        super().save(*args, **kwargs)
+
+    @property
+    def status_color(self):
+        return {
+            self.Status.PENDING: 'warning',
+            self.Status.ASSIGNED: 'info',
+            self.Status.REPAIRING: 'primary',
+            self.Status.PENDING_ACCEPTANCE: 'dark',
+            self.Status.COMPLETED: 'success',
+            self.Status.REJECTED: 'danger',
+            self.Status.CANCELLED: 'secondary',
+        }.get(self.status, 'secondary')
+
+    @property
+    def status_index(self):
+        flow = [
+            self.Status.PENDING,
+            self.Status.ASSIGNED,
+            self.Status.REPAIRING,
+            self.Status.PENDING_ACCEPTANCE,
+            self.Status.COMPLETED,
+        ]
+        try:
+            return flow.index(self.status)
+        except ValueError:
+            return -1
+
+
+class WorkOrderImage(models.Model):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name='images',
+        verbose_name='工单',
+    )
+    image = models.ImageField('照片', upload_to='repair_images/%Y/%m/')
+    uploaded_at = models.DateTimeField('上传时间', auto_now_add=True)
+
+    class Meta:
+        verbose_name = '工单照片'
+        verbose_name_plural = '工单照片'
+
+    def __str__(self):
+        return f'{self.work_order.order_no} 的照片'
