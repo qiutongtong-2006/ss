@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}撤销报修 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <span class="eyebrow">CANCEL ORDER</span>
+    <h1 class="page-title mt-1 mb-2">撤销报修</h1>
+    <p class="page-subtitle mb-0">
+        工单 {{ work_order.order_no }} · {{ work_order.building.name }} {{ work_order.room_no }}
+    </p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">工单信息</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">故障描述</span>
+                    <span class="info-value">{{ work_order.description|linebreaksbr }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">当前状态</span>
+                    <span class="info-value">{{ work_order.get_status_display }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card section-card">
+            <h2 class="section-title">确认撤销</h2>
+            <p class="text-muted small">
+                撤销后工单将变为“已撤销”，不能继续处理。只有待受理工单可以撤销。
+            </p>
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'repair/_field.html' with field=form.reason %}
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+                    <button class="btn btn-danger" type="submit"
+                            onclick="return confirm('确认撤销这条报修吗？')">确认撤销</button>
+                    <a class="btn btn-outline-secondary"
+                       href="{% url 'repair:work_order_detail' work_order.pk %}">返回详情</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

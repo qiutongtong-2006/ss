@@ -28,7 +28,11 @@
 {% else %}
     <div class="alert alert-{{ work_order.status_color }}">
         {{ work_order.get_status_display }}
-        {% if work_order.reject_reason %}：{{ work_order.reject_reason }}{% endif %}
+        {% if work_order.reject_reason %}
+            ：{{ work_order.reject_reason }}
+        {% elif work_order.cancel_reason %}
+            ：{{ work_order.cancel_reason }}
+        {% endif %}
     </div>
 {% endif %}
 
@@ -54,7 +58,7 @@
                     <span class="info-value">{{ work_order.repair_address|default:"未填写具体位置" }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">报修类别</span>
+                    <span class="info-label">报修分类</span>
                     <span class="info-value">{{ work_order.category.name }}</span>
                 </div>
                 <div class="info-item">
@@ -94,6 +98,35 @@
                 {% endfor %}
             </div>
         </div>
+
+        <div class="card section-card mt-4">
+            <h2 class="section-title">处理记录</h2>
+            {% if status_logs %}
+                <div class="timeline">
+                    {% for log in status_logs %}
+                        <div class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div class="timeline-content">
+                                <div class="d-flex justify-content-between gap-2">
+                                    <strong>
+                                        {% if log.from_status %}{{ log.get_from_status_display }} → {% endif %}{{ log.get_to_status_display }}
+                                    </strong>
+                                    <small class="text-muted">{{ log.created_at|date:"m-d H:i" }}</small>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    {{ log.operator.real_name|default:log.operator.username|default:"系统" }}
+                                </div>
+                                {% if log.remark %}
+                                    <div class="small mt-2">{{ log.remark|linebreaksbr }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted mb-0">暂无处理记录。</p>
+            {% endif %}
+        </div>
     </div>
 
     <div class="col-lg-4">
@@ -116,13 +149,47 @@
                     <span class="info-label">完工时间</span>
                     <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
+                <div class="info-item">
+                    <span class="info-label">联系备注</span>
+                    <span class="info-value">{{ work_order.contact_note|default:"—" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">约定上门时间</span>
+                    <span class="info-value">{{ work_order.appointment_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
             </div>
+        </div>
+
+        <div class="card section-card mb-4">
+            <h2 class="section-title">可执行操作</h2>
+            {% if can_cancel %}
+                <a class="btn btn-outline-danger w-100"
+                   href="{% url 'repair:cancel_order' work_order.pk %}">撤销报修</a>
+                <p class="form-text mb-0 mt-2">当前工单仍在待受理状态。</p>
+            {% elif can_manage %}
+                <div class="d-grid gap-2">
+                    <a class="btn btn-primary"
+                       href="{% url 'repair:accept_order' work_order.pk %}">受理并派单</a>
+                    <a class="btn btn-outline-danger"
+                       href="{% url 'repair:reject_order' work_order.pk %}">驳回报修</a>
+                </div>
+            {% elif can_repair %}
+                <button class="btn btn-primary w-100" type="button" disabled>接单（迭代 3 开放）</button>
+            {% else %}
+                <p class="text-muted small mb-0">当前角色或工单状态下没有可执行操作。</p>
+            {% endif %}
         </div>
 
         <div class="card section-card">
             <h2 class="section-title">需要帮助？</h2>
             <p class="text-muted small">如长时间未受理，请联系宿管并提供工单号。</p>
-            <a class="btn btn-outline-primary w-100" href="{% url 'repair:home' %}">返回首页</a>
+            {% if user.role == 'student' %}
+                <a class="btn btn-outline-primary w-100" href="{% url 'repair:my_orders' %}">返回我的报修</a>
+            {% elif user.role == 'manager' %}
+                <a class="btn btn-outline-primary w-100" href="{% url 'repair:manager_orders' %}">返回工单池</a>
+            {% else %}
+                <a class="btn btn-outline-primary w-100" href="{% url 'repair:home' %}">返回首页</a>
+            {% endif %}
         </div>
     </div>
 </div>

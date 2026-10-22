@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}受理并派单 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <span class="eyebrow">ACCEPT ORDER</span>
+    <h1 class="page-title mt-1 mb-2">受理并派单</h1>
+    <p class="page-subtitle mb-0">
+        工单 {{ work_order.order_no }} · {{ work_order.building.name }} {{ work_order.room_no }}
+    </p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">工单信息</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">报修学生</span>
+                    <span class="info-value">{{ work_order.student.real_name|default:work_order.student.username }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">联系电话</span>
+                    <span class="info-value">{{ work_order.contact_phone }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">位置</span>
+                    <span class="info-value">{{ work_order.building.name }} {{ work_order.room_no }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">故障描述</span>
+                    <span class="info-value">{{ work_order.description|linebreaksbr }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">入室授权</span>
+                    <span class="info-value">
+                        {% if work_order.allow_entry_without_student %}
+                            <span class="text-success">已授权</span>
+                        {% else %}
+                            <span class="text-warning">未授权</span>
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {% if not work_order.allow_entry_without_student %}
+                <div class="alert alert-warning mt-3 mb-0">
+                    学生未授权无人时进入宿舍，请先电话联系，并尽量填写联系备注或约定上门时间。
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="card section-card">
+            <h2 class="section-title">派单信息</h2>
+
+            {% if not has_repairers %}
+                <div class="alert alert-warning">
+                    暂无可用维修人员，请先在 Django Admin 创建维修人员账号。
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'repair/_field.html' with field=form.repairer %}
+                {% include 'repair/_field.html' with field=form.contact_note %}
+                {% include 'repair/_field.html' with field=form.appointment_at %}
+
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit"
+                            {% if not has_repairers %}disabled{% endif %}>确认受理并派单</button>
+                    <a class="btn btn-outline-secondary"
+                       href="{% url 'repair:work_order_detail' work_order.pk %}">返回详情</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

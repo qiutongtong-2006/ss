@@ -176,3 +176,70 @@ class WorkOrderSubmitForm(forms.ModelForm):
             if image.size > 5 * 1024 * 1024:
                 raise forms.ValidationError(f'照片 {image.name} 超过 5 MB。')
         return images
+
+
+class RejectOrderForm(forms.Form):
+    reason = forms.CharField(
+        label='驳回原因',
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': '请说明驳回原因，学生会在工单详情中看到',
+            }
+        ),
+    )
+
+
+class CancelOrderForm(forms.Form):
+    reason = forms.CharField(
+        label='撤销原因（选填）',
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '如果愿意，可以说明撤销原因',
+            }
+        ),
+    )
+
+
+class AcceptOrderForm(forms.Form):
+    repairer = forms.ModelChoiceField(
+        label='维修人员',
+        queryset=User.objects.none(),
+        empty_label='请选择维修人员',
+    )
+    contact_note = forms.CharField(
+        label='联系备注（选填）',
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '例如：已电话联系，约定周六上午上门',
+            }
+        ),
+        help_text='学生未授权入室时，建议记录联系结果。',
+    )
+    appointment_at = forms.DateTimeField(
+        label='约定上门时间（选填）',
+        required=False,
+        input_formats=['%Y-%m-%dT%H:%M'],
+        widget=forms.DateTimeInput(
+            attrs={'class': 'form-control', 'type': 'datetime-local'},
+            format='%Y-%m-%dT%H:%M',
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['repairer'].queryset = User.objects.filter(
+            role=User.Role.REPAIRER,
+            is_active=True,
+        ).order_by('username')
+        self.fields['repairer'].widget.attrs['class'] = 'form-select'

@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}工单池 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero d-flex flex-column flex-sm-row justify-content-between align-items-sm-end gap-3">
+    <div>
+        <span class="eyebrow">WORK QUEUE</span>
+        <h1 class="page-title mt-1 mb-2">工单池</h1>
+        <p class="page-subtitle mb-0">默认显示待受理工单，可切换状态并筛选楼栋、类别和关键词。</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{% url 'repair:manager_orders' %}">刷新工单池</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">全部工单</div>
+            <div class="h3 mb-0">{{ summary.total }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">待受理</div>
+            <div class="h3 mb-0 text-warning">{{ summary.pending }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">已派单</div>
+            <div class="h3 mb-0 text-info">{{ summary.assigned }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">维修中</div>
+            <div class="h3 mb-0 text-primary">{{ summary.repairing }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">待验收</div>
+            <div class="h3 mb-0">{{ summary.pending_acceptance }}</div>
+        </div>
+    </div>
+</div>
+
+{% include 'repair/_order_filters.html' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="section-title mb-0">工单列表</h2>
+    <span class="text-muted small">当前 {{ work_orders|length }} 条</span>
+</div>
+
+<div class="card section-card">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>工单号</th>
+                    <th>学生</th>
+                    <th>位置</th>
+                    <th>类别</th>
+                    <th>状态</th>
+                    <th>入室授权</th>
+                    <th>提交时间</th>
+                    <th class="text-end">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in work_orders %}
+                    <tr>
+                        <td><strong>{{ order.order_no }}</strong></td>
+                        <td>
+                            {{ order.student.real_name|default:order.student.username }}
+                            <div class="text-muted small">{{ order.contact_phone }}</div>
+                        </td>
+                        <td>{{ order.building.name }} {{ order.room_no }}</td>
+                        <td>{{ order.category.name }}</td>
+                        <td>
+                            <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                        </td>
+                        <td>
+                            {% if order.allow_entry_without_student %}
+                                <span class="text-success small">已授权</span>
+                            {% else %}
+                                <span class="text-warning small">需联系</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{% url 'repair:work_order_detail' order.pk %}">查看详情</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="text-center py-5">
+                                <div class="quick-icon mx-auto mb-3">单</div>
+                                <h3 class="h6">当前筛选条件下没有工单</h3>
+                                <p class="text-muted small mb-3">可以切换状态或清除筛选条件后再查看。</p>
+                                <a class="btn btn-outline-primary" href="{% url 'repair:manager_orders' %}">返回默认工单池</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
