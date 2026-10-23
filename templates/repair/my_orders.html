@@ -34,17 +34,34 @@
             </thead>
             <tbody>
                 {% for order in work_orders %}
-                    <tr>
+                    <tr class="{% if order.status == 'repairing' and order.return_count %}order-returned-row{% endif %}">
                         <td><strong>{{ order.order_no }}</strong></td>
                         <td>{{ order.building.name }} {{ order.room_no }}</td>
                         <td>{{ order.category.name }}</td>
                         <td>
-                            <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                            {% if order.status == 'repairing' and order.return_count %}
+                                <span class="badge text-bg-warning">返修中 · 第 {{ order.return_count }} 次</span>
+                                <div class="returned-note">上次验收未通过，维修人员正在继续处理</div>
+                            {% else %}
+                                <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                            {% endif %}
                         </td>
                         <td class="text-muted">{{ order.created_at|date:"Y-m-d H:i" }}</td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary"
-                               href="{% url 'repair:work_order_detail' order.pk %}">查看详情</a>
+                            <div class="d-flex justify-content-end flex-wrap gap-2">
+                                {% if order.status == 'pending_acceptance' %}
+                                    <a class="btn btn-sm btn-success"
+                                       href="{% url 'repair:acceptance_result' order.pk %}">去验收</a>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-primary"
+                                   href="{% url 'repair:work_order_detail' order.pk %}">
+                                    {% if order.status == 'repairing' and order.return_count %}
+                                        查看返修进度
+                                    {% else %}
+                                        查看详情
+                                    {% endif %}
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 {% empty %}

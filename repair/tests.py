@@ -465,11 +465,16 @@ class AcceptanceWorkflowTests(TestCase):
             completed_at=self.order.completed_at,
         )
 
-    def create_order(self, order_no='BX202610230011', status=WorkOrder.Status.PENDING_ACCEPTANCE):
+    def create_order(
+        self,
+        order_no='BX202610230011',
+        status=WorkOrder.Status.PENDING_ACCEPTANCE,
+        student=None,
+    ):
         now = timezone.now()
         return WorkOrder.objects.create(
             order_no=order_no,
-            student=self.student,
+            student=student or self.student,
             building=self.building,
             room_no='402',
             contact_phone='13900000000',
@@ -481,6 +486,68 @@ class AcceptanceWorkflowTests(TestCase):
             started_at=now,
             completed_at=now,
         )
+
+    def test_student_home_shows_actionable_order_counts(self):
+        self.create_order(
+            order_no='BX202610230012',
+            status=WorkOrder.Status.PENDING,
+        )
+        self.create_order(
+            order_no='BX202610230013',
+            status=WorkOrder.Status.ASSIGNED,
+        )
+        returned_order = self.create_order(
+            order_no='BX202610230014',
+            status=WorkOrder.Status.REPAIRING,
+        )
+        returned_order.return_count = 2
+        returned_order.save()
+        self.create_order(
+            order_no='BX202610230015',
+            status=WorkOrder.Status.PENDING,
+            student=self.other_student,
+        )
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse('repair:home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['student_summary'],
+            {
+                'pending_acceptance': 1,
+                'pending_processing': 3,
+                'returned': 1,
+            },
+        )
+        self.assertContains(response, '去验收')
+        self.assertContains(response, '其中 1 单正在返修。')
+
+    def test_my_orders_links_pending_acceptance_directly_to_review(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse('repair:my_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '去验收')
+        self.assertContains(
+            response,
+            reverse('repair:acceptance_result', args=[self.order.pk]),
+        )
+
+    def test_my_orders_highlights_returned_repair(self):
+        self.order.status = WorkOrder.Status.REPAIRING
+        self.order.return_count = 2
+        self.order.save()
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse('repair:my_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '返修中 · 第 2 次')
+        self.assertContains(response, '上次验收未通过')
+        self.assertContains(response, '查看返修进度')
+        self.assertContains(response, 'order-returned-row')
 
     def accept(self, rating='5', comment='维修及时，抽屉已经恢复正常。'):
         return self.client.post(

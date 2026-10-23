@@ -87,6 +87,9 @@ $env:DJANGO_SETTINGS_MODULE='ss.test_settings'
 # 迭代 4 MySQL 端到端验证（自动回滚临时数据）
 .\.venv\Scripts\python.exe scripts\iteration4_mysql_e2e.py
 
+# 迭代 4 MySQL 并发验收、并发退回验证
+.\.venv\Scripts\python.exe scripts\iteration4_mysql_concurrency.py
+
 # 创建管理员
 .\.venv\Scripts\python.exe manage.py createsuperuser
 ```

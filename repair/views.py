@@ -62,7 +62,38 @@ def register(request):
 @login_required
 def home(request):
     """登录后的首页，按角色显示不同入口。"""
-    return render(request, 'repair/home.html')
+    student_summary = None
+    if request.user.role == User.Role.STUDENT:
+        student_summary = WorkOrder.objects.filter(
+            student=request.user
+        ).aggregate(
+            pending_acceptance=Count(
+                'id',
+                filter=Q(status=WorkOrder.Status.PENDING_ACCEPTANCE),
+            ),
+            pending_processing=Count(
+                'id',
+                filter=Q(
+                    status__in=[
+                        WorkOrder.Status.PENDING,
+                        WorkOrder.Status.ASSIGNED,
+                        WorkOrder.Status.REPAIRING,
+                    ]
+                ),
+            ),
+            returned=Count(
+                'id',
+                filter=Q(
+                    status=WorkOrder.Status.REPAIRING,
+                    return_count__gt=0,
+                ),
+            ),
+        )
+    return render(
+        request,
+        'repair/home.html',
+        {'student_summary': student_summary},
+    )
 
 
 @login_required

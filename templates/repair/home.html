@@ -15,6 +15,46 @@
 </div>
 
 {% if user.role == 'student' %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <a class="student-action-card {% if student_summary.pending_acceptance %}attention{% endif %}"
+               href="{% url 'repair:my_orders' %}?status=pending_acceptance">
+                <span class="student-action-icon">验</span>
+                <span class="student-action-content">
+                    <span class="student-action-label">待验收</span>
+                    <span class="student-action-value">{{ student_summary.pending_acceptance }}<small> 单</small></span>
+                    <span class="student-action-text">
+                        {% if student_summary.pending_acceptance %}
+                            维修已完成，等待你确认结果并评价。
+                        {% else %}
+                            当前没有需要验收的工单。
+                        {% endif %}
+                    </span>
+                </span>
+                <span class="student-action-cta">
+                    {% if student_summary.pending_acceptance %}去验收{% else %}查看记录{% endif %}
+                </span>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a class="student-action-card {% if student_summary.returned %}returned{% endif %}"
+               href="{% url 'repair:my_orders' %}">
+                <span class="student-action-icon">修</span>
+                <span class="student-action-content">
+                    <span class="student-action-label">待处理</span>
+                    <span class="student-action-value">{{ student_summary.pending_processing }}<small> 单</small></span>
+                    <span class="student-action-text">
+                        包含待受理、已派单和维修中的报修。
+                        {% if student_summary.returned %}
+                            <strong class="text-warning-emphasis">其中 {{ student_summary.returned }} 单正在返修。</strong>
+                        {% endif %}
+                    </span>
+                </span>
+                <span class="student-action-cta">查看进度</span>
+            </a>
+        </div>
+    </div>
+
     <div class="row g-4">
         <div class="col-md-6">
             <a class="quick-card primary" href="{% url 'repair:submit_repair' %}">
