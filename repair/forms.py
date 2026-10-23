@@ -288,14 +288,13 @@ class AcceptanceEvaluationForm(forms.Form):
     rating = forms.TypedChoiceField(
         label='维修满意度',
         choices=[
-            (5, '5 星 · 非常满意'),
-            (4, '4 星 · 满意'),
-            (3, '3 星 · 一般'),
-            (2, '2 星 · 不满意'),
             (1, '1 星 · 很不满意'),
+            (2, '2 星 · 不满意'),
+            (3, '3 星 · 一般'),
+            (4, '4 星 · 满意'),
+            (5, '5 星 · 非常满意'),
         ],
         coerce=int,
-        initial=5,
         widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
     )
     comment = forms.CharField(

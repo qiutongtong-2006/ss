@@ -572,6 +572,9 @@ class AcceptanceWorkflowTests(TestCase):
         self.assertContains(response, '验收并评价')
         self.assertContains(response, self.record.repair_action)
         self.assertContains(response, '5 星 · 非常满意')
+        self.assertContains(response, 'class="star-option"', count=5)
+        self.assertContains(response, '非常满意 · 维修及时')
+        self.assertIsNone(response.context['form']['rating'].value())
 
     def test_other_student_cannot_open_acceptance_or_return_page(self):
         self.client.force_login(self.other_student)

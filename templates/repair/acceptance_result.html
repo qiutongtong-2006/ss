@@ -49,17 +49,39 @@
             <form method="post" novalidate>
                 {% csrf_token %}
 
-                <fieldset class="mb-4">
+                <fieldset class="star-rating-fieldset mb-4">
                     <legend class="form-label fs-6">{{ form.rating.label }}</legend>
-                    <div class="rating-options">
+                    <p class="star-rating-help">点击星星选择评分，鼠标悬停可预览。</p>
+                    <div class="star-rating">
                         {% for radio in form.rating %}
-                            <div class="form-check rating-option">
+                            <label class="star-option">
                                 {{ radio.tag }}
-                                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                <span class="star-symbol" aria-hidden="true"></span>
+                                <span class="visually-hidden">
                                     {{ radio.choice_label }}
-                                </label>
-                            </div>
+                                </span>
+                            </label>
                         {% endfor %}
+                    </div>
+                    <div class="star-feedback" aria-live="polite">
+                        <span class="star-feedback-placeholder">
+                            还未评分，请选择你本次的维修满意度。
+                        </span>
+                        <span class="star-feedback-item" data-rating="1">
+                            很不满意 · 请补充具体问题，方便后续改进。
+                        </span>
+                        <span class="star-feedback-item" data-rating="2">
+                            不满意 · 维修结果还有较多需要改进的地方。
+                        </span>
+                        <span class="star-feedback-item" data-rating="3">
+                            一般 · 问题基本解决，但体验仍有提升空间。
+                        </span>
+                        <span class="star-feedback-item" data-rating="4">
+                            满意 · 整体处理不错，感谢你的认可。
+                        </span>
+                        <span class="star-feedback-item" data-rating="5">
+                            非常满意 · 维修及时，问题解决得很好！
+                        </span>
                     </div>
                     {% for error in form.rating.errors %}
                         <div class="invalid-feedback d-block">{{ error }}</div>
