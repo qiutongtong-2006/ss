@@ -523,6 +523,10 @@ class AcceptanceWorkflowTests(TestCase):
         self.assertContains(response, '去评价')
         self.assertContains(response, '待评价')
         self.assertContains(response, '其中 1 单正在返修。')
+        self.assertContains(
+            response,
+            f"{reverse('repair:my_orders')}?status=active",
+        )
         content = response.content
         self.assertLess(
             content.find(b'class="quick-card primary"'),
@@ -539,6 +543,45 @@ class AcceptanceWorkflowTests(TestCase):
         self.assertContains(
             response,
             reverse('repair:acceptance_result', args=[self.order.pk]),
+        )
+
+    def test_my_orders_active_filter_excludes_history_and_acceptance(self):
+        active_order = self.create_order(
+            order_no='BX202610230016',
+            status=WorkOrder.Status.PENDING,
+        )
+        assigned_order = self.create_order(
+            order_no='BX202610230017',
+            status=WorkOrder.Status.ASSIGNED,
+        )
+        repairing_order = self.create_order(
+            order_no='BX202610230018',
+            status=WorkOrder.Status.REPAIRING,
+        )
+        completed_order = self.create_order(
+            order_no='BX202610230019',
+            status=WorkOrder.Status.COMPLETED,
+        )
+        self.client.force_login(self.student)
+
+        response = self.client.get(
+            reverse('repair:my_orders'),
+            {'status': 'active'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        visible_order_ids = {
+            order.pk for order in response.context['page_obj'].object_list
+        }
+        self.assertEqual(
+            visible_order_ids,
+            {active_order.pk, assigned_order.pk, repairing_order.pk},
+        )
+        self.assertNotIn(self.order.pk, visible_order_ids)
+        self.assertNotIn(completed_order.pk, visible_order_ids)
+        self.assertEqual(
+            response.context['filter_form'].fields['status'].choices[1],
+            ('active', '处理中'),
         )
 
     def test_my_orders_highlights_returned_repair(self):

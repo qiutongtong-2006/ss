@@ -3,6 +3,16 @@ from django.db.models import Q
 
 from .models import Building, RepairCategory, WorkOrder
 
+DEFAULT_ACTIVE_STATUSES = (
+    WorkOrder.Status.ASSIGNED,
+    WorkOrder.Status.REPAIRING,
+)
+STUDENT_PROCESSING_STATUSES = (
+    WorkOrder.Status.PENDING,
+    WorkOrder.Status.ASSIGNED,
+    WorkOrder.Status.REPAIRING,
+)
+
 
 class WorkOrderFilterForm(forms.Form):
     status = forms.ChoiceField(
@@ -30,12 +40,18 @@ class WorkOrderFilterForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, include_active=False, **kwargs):
+    def __init__(
+        self,
+        *args,
+        include_active=False,
+        active_label='当前任务',
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         if include_active:
             self.fields['status'].choices = [
                 ('', '全部状态'),
-                ('active', '当前任务'),
+                ('active', active_label),
                 *WorkOrder.Status.choices,
             ]
         self.fields['building'].queryset = Building.objects.all().order_by('name')
@@ -46,9 +62,19 @@ class WorkOrderFilterForm(forms.Form):
             field.widget.attrs.setdefault('class', css_class)
 
 
-def filter_work_orders(queryset, data=None, include_active=False):
+def filter_work_orders(
+    queryset,
+    data=None,
+    include_active=False,
+    active_label='当前任务',
+    active_statuses=None,
+):
     """按 GET 参数过滤工单，返回过滤后的查询集和绑定后的表单。"""
-    form = WorkOrderFilterForm(data or None, include_active=include_active)
+    form = WorkOrderFilterForm(
+        data or None,
+        include_active=include_active,
+        active_label=active_label,
+    )
     if form.is_valid():
         status = form.cleaned_data.get('status')
         building = form.cleaned_data.get('building')
@@ -57,10 +83,7 @@ def filter_work_orders(queryset, data=None, include_active=False):
 
         if status == 'active':
             queryset = queryset.filter(
-                status__in=[
-                    WorkOrder.Status.ASSIGNED,
-                    WorkOrder.Status.REPAIRING,
-                ]
+                status__in=active_statuses or DEFAULT_ACTIVE_STATUSES
             )
         elif status:
             queryset = queryset.filter(status=status)

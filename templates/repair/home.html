@@ -62,7 +62,7 @@
         </div>
         <div class="col-md-6">
             <a class="student-summary-card {% if student_summary.returned %}returned{% endif %}"
-               href="{% url 'repair:my_orders' %}">
+               href="{% url 'repair:my_orders' %}?status=active">
                 <span class="student-summary-icon">修</span>
                 <span class="student-summary-content">
                     <span class="student-summary-heading">

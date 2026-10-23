@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .filters import filter_work_orders
+from .filters import STUDENT_PROCESSING_STATUSES, filter_work_orders
 from .forms import (
     AcceptanceEvaluationForm,
     AcceptanceReturnForm,
@@ -73,13 +73,7 @@ def home(request):
             ),
             pending_processing=Count(
                 'id',
-                filter=Q(
-                    status__in=[
-                        WorkOrder.Status.PENDING,
-                        WorkOrder.Status.ASSIGNED,
-                        WorkOrder.Status.REPAIRING,
-                    ]
-                ),
+                filter=Q(status__in=STUDENT_PROCESSING_STATUSES),
             ),
             returned=Count(
                 'id',
@@ -108,7 +102,13 @@ def my_orders(request):
         'repairer',
     )
     params = request.GET.copy()
-    work_orders, filter_form = filter_work_orders(queryset, params)
+    work_orders, filter_form = filter_work_orders(
+        queryset,
+        params,
+        include_active=True,
+        active_label='处理中',
+        active_statuses=STUDENT_PROCESSING_STATUSES,
+    )
     page_obj, filter_query = paginate_work_orders(work_orders, params)
     return render(
         request,
