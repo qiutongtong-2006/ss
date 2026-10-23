@@ -580,6 +580,7 @@ class AcceptanceWorkflowTests(TestCase):
         self.assertContains(response, '5 星 · 非常满意')
         self.assertContains(response, 'class="star-option"', count=5)
         self.assertContains(response, '非常满意 · 维修及时')
+        self.assertNotContains(response, '点击星星选择评分')
         self.assertIsNone(response.context['form']['rating'].value())
 
     def test_other_student_cannot_open_acceptance_or_return_page(self):

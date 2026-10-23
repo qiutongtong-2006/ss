@@ -592,12 +592,6 @@ body {
     min-width: 0;
 }
 
-.star-rating-help {
-    margin: -0.35rem 0 0.8rem;
-    color: var(--muted);
-    font-size: 0.82rem;
-}
-
 .star-rating {
     display: flex;
     align-items: center;
