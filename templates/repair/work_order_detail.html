@@ -86,23 +86,35 @@
             </div>
         {% endif %}
 
-        {% if work_order.fault_cause or work_order.repair_action or work_order.materials_used %}
+        {% if repair_records %}
             <div class="card section-card mb-4">
                 <h2 class="section-title">维修记录</h2>
-                <div class="info-list">
-                    <div class="info-item">
-                        <span class="info-label">故障原因</span>
-                        <span class="info-value">{{ work_order.fault_cause|default:"未填写"|linebreaksbr }}</span>
+                {% for record in repair_records %}
+                    <div class="{% if not forloop.last %}border-bottom pb-4 mb-4{% endif %}">
+                        <div class="d-flex justify-content-between gap-3 mb-3">
+                            <strong>第 {{ forloop.counter }} 次维修</strong>
+                            <small class="text-muted">{{ record.completed_at|date:"Y-m-d H:i" }}</small>
+                        </div>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-label">维修人员</span>
+                                <span class="info-value">{{ record.repairer.real_name|default:record.repairer.username|default:"未知" }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">故障原因</span>
+                                <span class="info-value">{{ record.fault_cause|default:"未填写"|linebreaksbr }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">维修内容</span>
+                                <span class="info-value">{{ record.repair_action|linebreaksbr }}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">更换材料</span>
+                                <span class="info-value">{{ record.materials_used|default:"未更换"|linebreaksbr }}</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="info-item">
-                        <span class="info-label">维修内容</span>
-                        <span class="info-value">{{ work_order.repair_action|default:"未填写"|linebreaksbr }}</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="info-label">更换材料</span>
-                        <span class="info-value">{{ work_order.materials_used|default:"未更换"|linebreaksbr }}</span>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
         {% endif %}
 

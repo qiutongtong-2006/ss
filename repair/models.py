@@ -121,14 +121,6 @@ class WorkOrder(models.Model):
     )
     description = models.TextField('故障描述')
     remark = models.TextField('备注', max_length=500, blank=True, default='')
-    fault_cause = models.TextField('故障原因', blank=True, default='')
-    repair_action = models.TextField('维修内容', blank=True, default='')
-    materials_used = models.CharField(
-        '更换材料',
-        max_length=500,
-        blank=True,
-        default='',
-    )
     allow_entry_without_student = models.BooleanField(
         '宿舍无人时同意在宿管陪同下进入',
         default=False,
@@ -162,6 +154,20 @@ class WorkOrder(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(
+                fields=['repairer', 'status'],
+                name='wo_repairer_status_idx',
+            ),
+            models.Index(
+                fields=['student', 'status'],
+                name='wo_student_status_idx',
+            ),
+            models.Index(
+                fields=['status', 'created_at'],
+                name='wo_status_created_idx',
+            ),
+        ]
         verbose_name = '报修工单'
         verbose_name_plural = '报修工单'
 
@@ -216,6 +222,42 @@ class WorkOrderImage(models.Model):
 
     def __str__(self):
         return f'{self.work_order.order_no} 的照片'
+
+
+class RepairRecord(models.Model):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name='repair_records',
+        verbose_name='工单',
+    )
+    repairer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='repair_records',
+        verbose_name='维修人员',
+        limit_choices_to={'role': 'repairer'},
+    )
+    fault_cause = models.TextField('故障原因', blank=True, default='')
+    repair_action = models.TextField('维修内容')
+    materials_used = models.CharField(
+        '更换材料',
+        max_length=500,
+        blank=True,
+        default='',
+    )
+    completed_at = models.DateTimeField('完工时间')
+    created_at = models.DateTimeField('记录时间', auto_now_add=True)
+
+    class Meta:
+        ordering = ['completed_at', 'created_at']
+        verbose_name = '维修记录'
+        verbose_name_plural = '维修记录'
+
+    def __str__(self):
+        return f'{self.work_order.order_no} 的维修记录'
 
 
 class StatusLog(models.Model):

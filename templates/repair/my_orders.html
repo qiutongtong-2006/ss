@@ -16,7 +16,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="section-title mb-0">工单记录</h2>
-    <span class="text-muted small">共 {{ work_orders|length }} 条</span>
+    <span class="text-muted small">共 {{ page_obj.paginator.count }} 条</span>
 </div>
 
 <div class="card section-card">
@@ -63,4 +63,5 @@
         </table>
     </div>
 </div>
+{% include 'repair/_pagination.html' %}
 {% endblock %}

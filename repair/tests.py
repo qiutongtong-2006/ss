@@ -2,7 +2,14 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Building, RepairCategory, StatusLog, User, WorkOrder
+from .models import (
+    Building,
+    RepairCategory,
+    RepairRecord,
+    StatusLog,
+    User,
+    WorkOrder,
+)
 
 
 class RepairerWorkflowTests(TestCase):
@@ -30,6 +37,12 @@ class RepairerWorkflowTests(TestCase):
             password='manager-pass-123',
             role=User.Role.MANAGER,
             real_name='测试宿管',
+        )
+        self.admin_user = User.objects.create_superuser(
+            username='admin-test',
+            password='admin-pass-123',
+            role=User.Role.MANAGER,
+            real_name='测试管理员',
         )
         self.building = Building.objects.create(name='7号楼')
         self.category = RepairCategory.objects.create(name='水电')
@@ -66,6 +79,60 @@ class RepairerWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.order.order_no)
         self.assertNotContains(response, other_order.order_no)
+
+    def test_task_list_defaults_to_current_work_and_sorts_actionable_first(self):
+        repairing_order = self.create_order(
+            order_no='BX202610230004',
+            repairer=self.repairer,
+            status=WorkOrder.Status.REPAIRING,
+        )
+        historical_order = self.create_order(
+            order_no='BX202610230005',
+            repairer=self.repairer,
+            status=WorkOrder.Status.PENDING_ACCEPTANCE,
+        )
+        self.client.force_login(self.repairer)
+
+        response = self.client.get(reverse('repair:repairer_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [order.pk for order in response.context['page_obj'].object_list],
+            [self.order.pk, repairing_order.pk],
+        )
+        self.assertNotContains(response, historical_order.order_no)
+        self.assertContains(response, '接单')
+        self.assertContains(response, '填写完工')
+
+        response = self.client.get(
+            reverse('repair:repairer_orders'),
+            {'status': WorkOrder.Status.PENDING_ACCEPTANCE},
+        )
+        self.assertContains(response, historical_order.order_no)
+
+    def test_task_list_is_paginated_and_keeps_default_filter(self):
+        for index in range(20):
+            self.create_order(
+                order_no=f'BX20261024{index:04d}',
+                repairer=self.repairer,
+                status=WorkOrder.Status.ASSIGNED,
+            )
+        self.client.force_login(self.repairer)
+
+        response = self.client.get(reverse('repair:repairer_orders'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['page_obj'].object_list), 20)
+        self.assertEqual(response.context['page_obj'].paginator.count, 21)
+        self.assertContains(response, 'status=active')
+        self.assertContains(response, '下一页')
+
+        response = self.client.get(
+            reverse('repair:repairer_orders'),
+            {'status': 'active', 'page': 2},
+        )
+        self.assertEqual(response.context['page_obj'].number, 2)
+        self.assertEqual(len(response.context['page_obj'].object_list), 1)
 
     def test_non_repairer_cannot_open_task_list(self):
         self.client.force_login(self.student)
@@ -104,6 +171,17 @@ class RepairerWorkflowTests(TestCase):
         self.assertEqual(self.order.status, WorkOrder.Status.ASSIGNED)
         self.assertIsNone(self.order.started_at)
         self.assertFalse(StatusLog.objects.filter(work_order=self.order).exists())
+
+    def test_start_repair_requires_post(self):
+        self.client.force_login(self.repairer)
+
+        response = self.client.get(
+            reverse('repair:start_repair', args=[self.order.pk])
+        )
+
+        self.assertEqual(response.status_code, 405)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, WorkOrder.Status.ASSIGNED)
 
     def test_order_must_be_assigned_before_repairer_can_start(self):
         pending_order = self.create_order(order_no='BX202610230003')
@@ -144,13 +222,13 @@ class RepairerWorkflowTests(TestCase):
         )
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, WorkOrder.Status.PENDING_ACCEPTANCE)
-        self.assertEqual(self.order.fault_cause, '水龙头阀芯老化')
-        self.assertEqual(
-            self.order.repair_action,
-            '更换阀芯并测试，漏水问题已解决。',
-        )
-        self.assertEqual(self.order.materials_used, '阀芯 1 个')
         self.assertIsNotNone(self.order.completed_at)
+        record = RepairRecord.objects.get(work_order=self.order)
+        self.assertEqual(record.repairer, self.repairer)
+        self.assertEqual(record.fault_cause, '水龙头阀芯老化')
+        self.assertEqual(record.repair_action, '更换阀芯并测试，漏水问题已解决。')
+        self.assertEqual(record.materials_used, '阀芯 1 个')
+        self.assertEqual(record.completed_at, self.order.completed_at)
         log = StatusLog.objects.get(work_order=self.order)
         self.assertEqual(log.from_status, WorkOrder.Status.REPAIRING)
         self.assertEqual(log.to_status, WorkOrder.Status.PENDING_ACCEPTANCE)
@@ -176,6 +254,7 @@ class RepairerWorkflowTests(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, WorkOrder.Status.REPAIRING)
         self.assertIsNone(self.order.completed_at)
+        self.assertFalse(RepairRecord.objects.filter(work_order=self.order).exists())
         self.assertFalse(StatusLog.objects.filter(work_order=self.order).exists())
 
     def test_repairer_cannot_complete_before_starting(self):
@@ -216,7 +295,55 @@ class RepairerWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, WorkOrder.Status.REPAIRING)
+        self.assertFalse(RepairRecord.objects.filter(work_order=self.order).exists())
         self.assertFalse(StatusLog.objects.filter(work_order=self.order).exists())
+
+    def test_manager_cannot_start_or_complete_repair(self):
+        self.client.force_login(self.manager)
+
+        response = self.client.post(
+            reverse('repair:start_repair', args=[self.order.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+
+        self.order.status = WorkOrder.Status.REPAIRING
+        self.order.save()
+        response = self.client.post(
+            reverse('repair:complete_repair', args=[self.order.pk]),
+            {
+                'fault_cause': '',
+                'repair_action': '管理员不应提交',
+                'materials_used': '',
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(RepairRecord.objects.filter(work_order=self.order).exists())
+
+    def test_duplicate_completion_submit_creates_one_record(self):
+        self.order.status = WorkOrder.Status.REPAIRING
+        self.order.started_at = timezone.now()
+        self.order.save()
+        self.client.force_login(self.repairer)
+        payload = {
+            'fault_cause': '线路松动',
+            'repair_action': '重新接线并测试',
+            'materials_used': '',
+        }
+        url = reverse('repair:complete_repair', args=[self.order.pk])
+
+        first_response = self.client.post(url, payload)
+        second_response = self.client.post(url, payload)
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        self.assertEqual(
+            RepairRecord.objects.filter(work_order=self.order).count(),
+            1,
+        )
+        self.assertEqual(
+            StatusLog.objects.filter(work_order=self.order).count(),
+            1,
+        )
 
     def test_detail_shows_next_step_for_assigned_repairer(self):
         self.client.force_login(self.repairer)
@@ -240,3 +367,53 @@ class RepairerWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '填写维修记录并提交完工')
+
+    def test_repeated_repair_keeps_previous_records(self):
+        self.order.status = WorkOrder.Status.REPAIRING
+        self.order.started_at = timezone.now()
+        self.order.save()
+        self.client.force_login(self.repairer)
+
+        self.client.post(
+            reverse('repair:complete_repair', args=[self.order.pk]),
+            {
+                'fault_cause': '第一次故障',
+                'repair_action': '第一次维修',
+                'materials_used': '材料一',
+            },
+        )
+        self.order.status = WorkOrder.Status.REPAIRING
+        self.order.save()
+        self.client.post(
+            reverse('repair:complete_repair', args=[self.order.pk]),
+            {
+                'fault_cause': '第二次故障',
+                'repair_action': '第二次维修',
+                'materials_used': '材料二',
+            },
+        )
+
+        records = RepairRecord.objects.filter(work_order=self.order)
+        self.assertEqual(records.count(), 2)
+        self.assertEqual(records[0].repair_action, '第一次维修')
+        self.assertEqual(records[1].repair_action, '第二次维修')
+
+    def test_admin_cannot_edit_workflow_fields(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse('admin:repair_workorder_change', args=[self.order.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        admin_form = response.context['adminform'].form
+        for field_name in (
+            'status',
+            'repairer',
+            'accepted_at',
+            'assigned_at',
+            'started_at',
+            'completed_at',
+            'verified_at',
+        ):
+            self.assertNotIn(field_name, admin_form.fields)

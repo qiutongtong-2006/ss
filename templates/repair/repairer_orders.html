@@ -7,7 +7,9 @@
     <div>
         <span class="eyebrow">MY REPAIR TASKS</span>
         <h1 class="page-title mt-1 mb-2">我的维修任务</h1>
-        <p class="page-subtitle mb-0">这里只显示派给当前维修人员的工单，可按状态、楼栋和类别筛选。</p>
+        <p class="page-subtitle mb-0">
+            这里只显示派给当前维修人员的工单，默认列出待接单和维修中的当前任务。
+        </p>
     </div>
     <a class="btn btn-outline-primary" href="{% url 'repair:repairer_orders' %}">刷新任务</a>
 </div>
@@ -49,7 +51,7 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="section-title mb-0">任务列表</h2>
-    <span class="text-muted small">当前 {{ work_orders|length }} 条</span>
+    <span class="text-muted small">共 {{ page_obj.paginator.count }} 条</span>
 </div>
 
 <div class="card section-card">
@@ -92,8 +94,19 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-                            <a class="btn btn-sm btn-outline-primary"
-                               href="{% url 'repair:work_order_detail' order.pk %}">查看任务</a>
+                            <div class="d-flex justify-content-end align-items-center gap-2 flex-wrap">
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{% url 'repair:work_order_detail' order.pk %}">详情</a>
+                                {% if order.status == 'assigned' %}
+                                    <form method="post" action="{% url 'repair:start_repair' order.pk %}" class="m-0">
+                                        {% csrf_token %}
+                                        <button class="btn btn-sm btn-primary" type="submit">接单</button>
+                                    </form>
+                                {% elif order.status == 'repairing' %}
+                                    <a class="btn btn-sm btn-primary"
+                                       href="{% url 'repair:complete_repair' order.pk %}">填写完工</a>
+                                {% endif %}
+                            </div>
                         </td>
                     </tr>
                 {% empty %}
@@ -102,7 +115,7 @@
                             <div class="text-center py-5">
                                 <div class="quick-icon mx-auto mb-3">修</div>
                                 <h3 class="h6">当前没有符合条件的维修任务</h3>
-                                <p class="text-muted small mb-3">等待宿管派单，或清除筛选条件后再查看。</p>
+                                <p class="text-muted small mb-3">当前没有待接单或维修中的任务，可切换到全部状态查看历史。</p>
                                 <a class="btn btn-outline-primary" href="{% url 'repair:repairer_orders' %}">重置任务列表</a>
                             </div>
                         </td>
@@ -112,4 +125,5 @@
         </table>
     </div>
 </div>
+{% include 'repair/_pagination.html' %}
 {% endblock %}

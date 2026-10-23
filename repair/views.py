@@ -2,8 +2,9 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Case, Count, F, IntegerField, Q, Value, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -17,7 +18,22 @@ from .forms import (
     StudentRegistrationForm,
     WorkOrderSubmitForm,
 )
-from .models import Building, StatusLog, User, WorkOrder, WorkOrderImage
+from .models import (
+    Building,
+    RepairRecord,
+    StatusLog,
+    User,
+    WorkOrder,
+    WorkOrderImage,
+)
+
+
+def paginate_work_orders(queryset, params):
+    """分页并把当前筛选条件保留到翻页链接中。"""
+    page_obj = Paginator(queryset, 20).get_page(params.get('page'))
+    query_params = params.copy()
+    query_params.pop('page', None)
+    return page_obj, query_params.urlencode()
 
 
 def register(request):
@@ -57,12 +73,16 @@ def my_orders(request):
         'category',
         'repairer',
     )
-    work_orders, filter_form = filter_work_orders(queryset, request.GET)
+    params = request.GET.copy()
+    work_orders, filter_form = filter_work_orders(queryset, params)
+    page_obj, filter_query = paginate_work_orders(work_orders, params)
     return render(
         request,
         'repair/my_orders.html',
         {
-            'work_orders': work_orders,
+            'work_orders': page_obj,
+            'page_obj': page_obj,
+            'filter_query': filter_query,
             'filter_form': filter_form,
         },
     )
@@ -74,14 +94,43 @@ def repairer_orders(request):
     if request.user.role != User.Role.REPAIRER:
         raise PermissionDenied('只有维修人员可以查看“我的维修任务”。')
 
-    queryset = WorkOrder.objects.filter(repairer=request.user).select_related(
-        'student',
-        'building',
-        'category',
-        'repairer',
+    params = request.GET.copy()
+    if 'status' not in params:
+        params['status'] = 'active'
+
+    queryset = (
+        WorkOrder.objects.filter(repairer=request.user)
+        .select_related(
+            'student',
+            'building',
+            'category',
+            'repairer',
+        )
+        .annotate(
+            task_priority=Case(
+                When(status=WorkOrder.Status.ASSIGNED, then=Value(0)),
+                When(status=WorkOrder.Status.REPAIRING, then=Value(1)),
+                When(
+                    status=WorkOrder.Status.PENDING_ACCEPTANCE,
+                    then=Value(2),
+                ),
+                default=Value(3),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by(
+            'task_priority',
+            F('appointment_at').asc(nulls_last=True),
+            '-assigned_at',
+        )
     )
-    work_orders, filter_form = filter_work_orders(queryset, request.GET)
-    summary = queryset.aggregate(
+    work_orders, filter_form = filter_work_orders(
+        queryset,
+        params,
+        include_active=True,
+    )
+    page_obj, filter_query = paginate_work_orders(work_orders, params)
+    summary = WorkOrder.objects.filter(repairer=request.user).aggregate(
         total=Count('id'),
         assigned=Count('id', filter=Q(status=WorkOrder.Status.ASSIGNED)),
         repairing=Count('id', filter=Q(status=WorkOrder.Status.REPAIRING)),
@@ -95,7 +144,9 @@ def repairer_orders(request):
         request,
         'repair/repairer_orders.html',
         {
-            'work_orders': work_orders,
+            'work_orders': page_obj,
+            'page_obj': page_obj,
+            'filter_query': filter_query,
             'filter_form': filter_form,
             'summary': summary,
         },
@@ -112,7 +163,7 @@ def manager_orders(request):
         raise PermissionDenied('只有宿管可以查看工单池。')
 
     params = request.GET.copy()
-    if not params:
+    if 'status' not in params:
         params['status'] = WorkOrder.Status.PENDING
 
     queryset = WorkOrder.objects.select_related(
@@ -122,6 +173,7 @@ def manager_orders(request):
         'repairer',
     )
     work_orders, filter_form = filter_work_orders(queryset, params)
+    page_obj, filter_query = paginate_work_orders(work_orders, params)
     summary = WorkOrder.objects.aggregate(
         total=Count('id'),
         pending=Count('id', filter=Q(status=WorkOrder.Status.PENDING)),
@@ -137,7 +189,9 @@ def manager_orders(request):
         request,
         'repair/manager_orders.html',
         {
-            'work_orders': work_orders,
+            'work_orders': page_obj,
+            'page_obj': page_obj,
+            'filter_query': filter_query,
             'filter_form': filter_form,
             'summary': summary,
         },
@@ -197,7 +251,7 @@ def work_order_detail(request, pk):
             'building',
             'category',
             'repairer',
-        ),
+        ).prefetch_related('repair_records__repairer'),
         pk=pk,
     )
 
@@ -225,6 +279,7 @@ def work_order_detail(request, pk):
         and work_order.repairer_id == request.user.id
     )
     status_logs = work_order.status_logs.select_related('operator')
+    repair_records = work_order.repair_records.all()
 
     return render(
         request,
@@ -232,6 +287,7 @@ def work_order_detail(request, pk):
         {
             'work_order': work_order,
             'status_logs': status_logs,
+            'repair_records': repair_records,
             'can_cancel': (
                 is_student_owner
                 and work_order.status == WorkOrder.Status.PENDING
@@ -319,13 +375,18 @@ def complete_repair(request, pk):
                         pk=locked_order.pk,
                     )
 
-                locked_order.fault_cause = fault_cause
-                locked_order.repair_action = repair_action
-                locked_order.materials_used = materials_used
                 locked_order.status = WorkOrder.Status.PENDING_ACCEPTANCE
                 locked_order.completed_at = now
                 locked_order.save()
 
+                RepairRecord.objects.create(
+                    work_order=locked_order,
+                    repairer=request.user,
+                    fault_cause=fault_cause,
+                    repair_action=repair_action,
+                    materials_used=materials_used,
+                    completed_at=now,
+                )
                 remark_parts = [f'维修内容：{repair_action}']
                 if fault_cause:
                     remark_parts.insert(0, f'故障原因：{fault_cause}')
@@ -342,13 +403,7 @@ def complete_repair(request, pk):
             messages.success(request, '维修记录已保存，工单已提交完工并等待学生验收。')
             return redirect('repair:work_order_detail', pk=work_order.pk)
     else:
-        form = RepairCompletionForm(
-            initial={
-                'fault_cause': work_order.fault_cause,
-                'repair_action': work_order.repair_action,
-                'materials_used': work_order.materials_used,
-            }
-        )
+        form = RepairCompletionForm()
 
     return render(
         request,

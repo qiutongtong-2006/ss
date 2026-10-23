@@ -1,7 +1,15 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import Building, RepairCategory, StatusLog, User, WorkOrder, WorkOrderImage
+from .models import (
+    Building,
+    RepairCategory,
+    RepairRecord,
+    StatusLog,
+    User,
+    WorkOrder,
+    WorkOrderImage,
+)
 
 
 @admin.register(User)
@@ -37,12 +45,39 @@ class WorkOrderImageInline(admin.TabularInline):
     readonly_fields = ('uploaded_at',)
 
 
+class RepairRecordInline(admin.TabularInline):
+    model = RepairRecord
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        'repairer',
+        'fault_cause',
+        'repair_action',
+        'materials_used',
+        'completed_at',
+        'created_at',
+    )
+    ordering = ('completed_at',)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 class StatusLogInline(admin.TabularInline):
     model = StatusLog
     extra = 0
     can_delete = False
     readonly_fields = ('from_status', 'to_status', 'operator', 'remark', 'created_at')
     ordering = ('created_at',)
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(WorkOrder)
@@ -78,14 +113,27 @@ class WorkOrderAdmin(admin.ModelAdmin):
         'remark',
         'repairer__username',
         'repairer__real_name',
-        'repair_action',
+        'repair_records__repair_action',
     )
     readonly_fields = (
         'order_no',
+        'status',
+        'repairer',
+        'accepted_at',
+        'assigned_at',
         'started_at',
         'completed_at',
+        'verified_at',
+        'reject_reason',
+        'cancel_reason',
         'created_at',
         'updated_at',
     )
     date_hierarchy = 'created_at'
-    inlines = [WorkOrderImageInline, StatusLogInline]
+    inlines = [WorkOrderImageInline, RepairRecordInline, StatusLogInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

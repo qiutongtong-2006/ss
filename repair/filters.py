@@ -30,8 +30,14 @@ class WorkOrderFilterForm(forms.Form):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, include_active=False, **kwargs):
         super().__init__(*args, **kwargs)
+        if include_active:
+            self.fields['status'].choices = [
+                ('', '全部状态'),
+                ('active', '当前任务'),
+                *WorkOrder.Status.choices,
+            ]
         self.fields['building'].queryset = Building.objects.all().order_by('name')
         self.fields['category'].queryset = RepairCategory.objects.all().order_by('name')
 
@@ -40,16 +46,23 @@ class WorkOrderFilterForm(forms.Form):
             field.widget.attrs.setdefault('class', css_class)
 
 
-def filter_work_orders(queryset, data=None):
+def filter_work_orders(queryset, data=None, include_active=False):
     """按 GET 参数过滤工单，返回过滤后的查询集和绑定后的表单。"""
-    form = WorkOrderFilterForm(data or None)
+    form = WorkOrderFilterForm(data or None, include_active=include_active)
     if form.is_valid():
         status = form.cleaned_data.get('status')
         building = form.cleaned_data.get('building')
         category = form.cleaned_data.get('category')
         keyword = form.cleaned_data.get('q', '').strip()
 
-        if status:
+        if status == 'active':
+            queryset = queryset.filter(
+                status__in=[
+                    WorkOrder.Status.ASSIGNED,
+                    WorkOrder.Status.REPAIRING,
+                ]
+            )
+        elif status:
             queryset = queryset.filter(status=status)
         if building:
             queryset = queryset.filter(building=building)
