@@ -22,7 +22,7 @@
 - [x] 迭代 1：学生注册登录与提交报修
 - [x] 迭代 2：宿管受理派单
 - [x] 迭代 3：维修人员接单与维修记录
-- [ ] 迭代 4：学生验收评价，主闭环打通
+- [x] 迭代 4：学生验收评价，主闭环打通
 - [ ] 迭代 5：权限加固与基础数据
 - [ ] 迭代 6：缓冲、缺陷修复与交付
 
@@ -41,6 +41,8 @@
 - [迭代 2 完成记录](迭代2-完成记录.md)
 - [迭代 3 计划](迭代3-计划.md)
 - [迭代 3 完成记录](迭代3-完成记录.md)
+- [迭代 4 计划](迭代4-计划.md)
+- [迭代 4 完成记录](迭代4-完成记录.md)
 - [UI 优化待办](UI优化待办.md)
 
 图表文件：
@@ -81,6 +83,9 @@ $env:DJANGO_SETTINGS_MODULE='ss.test_settings'
 
 # 应用迁移
 .\.venv\Scripts\python.exe manage.py migrate
+
+# 迭代 4 MySQL 端到端验证（自动回滚临时数据）
+.\.venv\Scripts\python.exe scripts\iteration4_mysql_e2e.py
 
 # 创建管理员
 .\.venv\Scripts\python.exe manage.py createsuperuser

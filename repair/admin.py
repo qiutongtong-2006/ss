@@ -3,6 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from .models import (
     Building,
+    Evaluation,
     RepairCategory,
     RepairRecord,
     StatusLog,
@@ -80,6 +81,25 @@ class StatusLogInline(admin.TabularInline):
         return False
 
 
+class EvaluationInline(admin.StackedInline):
+    model = Evaluation
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        'student',
+        'rating',
+        'comment',
+        'created_at',
+    )
+    max_num = 1
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(WorkOrder)
 class WorkOrderAdmin(admin.ModelAdmin):
     list_display = (
@@ -124,15 +144,49 @@ class WorkOrderAdmin(admin.ModelAdmin):
         'started_at',
         'completed_at',
         'verified_at',
+        'return_count',
         'reject_reason',
         'cancel_reason',
         'created_at',
         'updated_at',
     )
     date_hierarchy = 'created_at'
-    inlines = [WorkOrderImageInline, RepairRecordInline, StatusLogInline]
+    inlines = [
+        WorkOrderImageInline,
+        RepairRecordInline,
+        EvaluationInline,
+        StatusLogInline,
+    ]
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(Evaluation)
+class EvaluationAdmin(admin.ModelAdmin):
+    list_display = ('work_order', 'student', 'rating', 'created_at')
+    list_filter = ('rating', 'created_at')
+    search_fields = (
+        'work_order__order_no',
+        'student__username',
+        'student__real_name',
+        'comment',
+    )
+    readonly_fields = (
+        'work_order',
+        'student',
+        'rating',
+        'comment',
+        'created_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

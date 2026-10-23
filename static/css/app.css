@@ -456,6 +456,44 @@ body {
     padding: 0.8rem 1rem;
 }
 
+.evaluation-card {
+    background:
+        linear-gradient(135deg, rgba(240, 253, 244, 0.88), rgba(239, 246, 255, 0.92));
+    border-color: #bbf7d0;
+}
+
+.evaluation-stars {
+    color: #f59e0b;
+    font-size: 1.55rem;
+    letter-spacing: 0.08em;
+}
+
+.rating-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.65rem;
+}
+
+.rating-option {
+    margin: 0;
+    padding: 0.8rem 0.9rem 0.8rem 2.6rem;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #f8fbff;
+}
+
+.rating-option:has(input:checked) {
+    border-color: #60a5fa;
+    background: #eff6ff;
+    box-shadow: 0 0 0 0.18rem rgba(59, 130, 246, 0.10);
+}
+
+.rating-option .form-check-input {
+    float: none;
+    margin-left: -1.65rem;
+    margin-top: 0.25rem;
+}
+
 .app-footer {
     padding: 1.5rem 0;
     color: var(--muted);

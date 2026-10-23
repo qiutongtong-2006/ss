@@ -118,6 +118,20 @@
             </div>
         {% endif %}
 
+        {% if evaluation %}
+            <div class="card section-card mb-4 evaluation-card">
+                <div class="d-flex flex-column flex-sm-row justify-content-between gap-2 mb-3">
+                    <h2 class="section-title mb-0">学生验收评价</h2>
+                    <small class="text-muted">{{ evaluation.created_at|date:"Y-m-d H:i" }}</small>
+                </div>
+                <div class="evaluation-stars mb-3" aria-label="{{ evaluation.rating }} 星评价">
+                    {{ evaluation.star_display }}
+                    <span class="text-muted small ms-2">{{ evaluation.rating }} / 5 星</span>
+                </div>
+                <p class="mb-0 text-break">{{ evaluation.comment|linebreaksbr }}</p>
+            </div>
+        {% endif %}
+
         <div class="card section-card">
             <h2 class="section-title">现场照片</h2>
             <div class="photo-gallery">
@@ -132,7 +146,7 @@
         </div>
 
         <div class="card section-card mt-4">
-            <h2 class="section-title">处理记录</h2>
+            <h2 class="section-title">完整处理时间线</h2>
             {% if status_logs %}
                 <div class="timeline">
                     {% for log in status_logs %}
@@ -143,7 +157,7 @@
                                     <strong>
                                         {% if log.from_status %}{{ log.get_from_status_display }} → {% endif %}{{ log.get_to_status_display }}
                                     </strong>
-                                    <small class="text-muted">{{ log.created_at|date:"m-d H:i" }}</small>
+                                    <small class="text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                                 </div>
                                 <div class="text-muted small mt-1">
                                     {{ log.operator.real_name|default:log.operator.username|default:"系统" }}
@@ -182,9 +196,19 @@
                     <span class="info-value">{{ work_order.started_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
                 <div class="info-item">
-                    <span class="info-label">完工时间</span>
+                    <span class="info-label">最近完工时间</span>
                     <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
+                <div class="info-item">
+                    <span class="info-label">验收时间</span>
+                    <span class="info-value">{{ work_order.verified_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+                {% if work_order.return_count %}
+                    <div class="info-item">
+                        <span class="info-label">退回返修次数</span>
+                        <span class="info-value">{{ work_order.return_count }} 次</span>
+                    </div>
+                {% endif %}
                 <div class="info-item">
                     <span class="info-label">联系备注</span>
                     <span class="info-value">{{ work_order.contact_note|default:"—" }}</span>
@@ -219,6 +243,18 @@
                 <a class="btn btn-primary w-100"
                    href="{% url 'repair:complete_repair' work_order.pk %}">填写维修记录并提交完工</a>
                 <p class="form-text mb-0 mt-2">提交后工单将等待学生验收。</p>
+            {% elif can_accept_result %}
+                <div class="d-grid gap-2">
+                    <a class="btn btn-success"
+                       href="{% url 'repair:acceptance_result' work_order.pk %}">验收并评价</a>
+                    <a class="btn btn-outline-warning"
+                       href="{% url 'repair:return_repair' work_order.pk %}">退回返修</a>
+                </div>
+                <p class="form-text mb-0 mt-2">维修已解决请验收评价；问题仍存在请退回。</p>
+            {% elif work_order.status == 'completed' and evaluation %}
+                <div class="alert alert-success mb-0">
+                    工单已完成验收，学生评价已归档。
+                </div>
             {% else %}
                 <p class="text-muted small mb-0">当前角色或工单状态下没有可执行操作。</p>
             {% endif %}

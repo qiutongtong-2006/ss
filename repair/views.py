@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST
 
 from .filters import filter_work_orders
 from .forms import (
+    AcceptanceEvaluationForm,
+    AcceptanceReturnForm,
     AcceptOrderForm,
     CancelOrderForm,
     RepairCompletionForm,
@@ -20,6 +22,7 @@ from .forms import (
 )
 from .models import (
     Building,
+    Evaluation,
     RepairRecord,
     StatusLog,
     User,
@@ -251,7 +254,11 @@ def work_order_detail(request, pk):
             'building',
             'category',
             'repairer',
-        ).prefetch_related('repair_records__repairer'),
+            'evaluation__student',
+        ).prefetch_related(
+            'repair_records__repairer',
+            'status_logs__operator',
+        ),
         pk=pk,
     )
 
@@ -280,6 +287,7 @@ def work_order_detail(request, pk):
     )
     status_logs = work_order.status_logs.select_related('operator')
     repair_records = work_order.repair_records.all()
+    evaluation = getattr(work_order, 'evaluation', None)
 
     return render(
         request,
@@ -288,6 +296,7 @@ def work_order_detail(request, pk):
             'work_order': work_order,
             'status_logs': status_logs,
             'repair_records': repair_records,
+            'evaluation': evaluation,
             'can_cancel': (
                 is_student_owner
                 and work_order.status == WorkOrder.Status.PENDING
@@ -303,6 +312,10 @@ def work_order_detail(request, pk):
             'can_complete_repair': (
                 is_repairer_assigned
                 and work_order.status == WorkOrder.Status.REPAIRING
+            ),
+            'can_accept_result': (
+                is_student_owner
+                and work_order.status == WorkOrder.Status.PENDING_ACCEPTANCE
             ),
         },
     )
@@ -411,6 +424,153 @@ def complete_repair(request, pk):
         {
             'work_order': work_order,
             'form': form,
+        },
+    )
+
+
+@login_required
+def acceptance_result(request, pk):
+    """学生验收通过，并对已完工工单提交一次性评价。"""
+    work_order = get_object_or_404(
+        WorkOrder.objects.select_related(
+            'student',
+            'building',
+            'category',
+            'repairer',
+        ).prefetch_related('repair_records__repairer'),
+        pk=pk,
+    )
+    if (
+        request.user.role != User.Role.STUDENT
+        or work_order.student_id != request.user.id
+    ):
+        raise PermissionDenied('只能验收自己的报修。')
+    if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
+        messages.error(request, '只有待验收工单可以确认修复。')
+        return redirect('repair:work_order_detail', pk=work_order.pk)
+
+    if request.method == 'POST':
+        form = AcceptanceEvaluationForm(request.POST)
+        if form.is_valid():
+            rating = form.cleaned_data['rating']
+            comment = form.cleaned_data['comment'].strip()
+            now = timezone.now()
+
+            with transaction.atomic():
+                locked_order = WorkOrder.objects.select_for_update().get(
+                    pk=work_order.pk
+                )
+                if locked_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
+                    messages.error(request, '工单状态已变化，请刷新后重试。')
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+                if Evaluation.objects.filter(work_order_id=locked_order.pk).exists():
+                    messages.error(request, '该工单已经提交过评价。')
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+
+                locked_order.status = WorkOrder.Status.COMPLETED
+                locked_order.verified_at = now
+                locked_order.save()
+                Evaluation.objects.create(
+                    work_order=locked_order,
+                    student=request.user,
+                    rating=rating,
+                    comment=comment,
+                )
+                StatusLog.objects.create(
+                    work_order=locked_order,
+                    from_status=WorkOrder.Status.PENDING_ACCEPTANCE,
+                    to_status=WorkOrder.Status.COMPLETED,
+                    operator=request.user,
+                    remark=f'学生验收通过；评分 {rating} 星',
+                )
+
+            messages.success(request, '验收完成，感谢你的评价。')
+            return redirect('repair:work_order_detail', pk=work_order.pk)
+    else:
+        form = AcceptanceEvaluationForm()
+
+    latest_record = work_order.repair_records.last()
+    return render(
+        request,
+        'repair/acceptance_result.html',
+        {
+            'work_order': work_order,
+            'form': form,
+            'latest_record': latest_record,
+        },
+    )
+
+
+@login_required
+def return_repair(request, pk):
+    """学生退回未修复的工单，由原维修人员继续处理。"""
+    work_order = get_object_or_404(
+        WorkOrder.objects.select_related(
+            'student',
+            'building',
+            'category',
+            'repairer',
+        ).prefetch_related('repair_records__repairer'),
+        pk=pk,
+    )
+    if (
+        request.user.role != User.Role.STUDENT
+        or work_order.student_id != request.user.id
+    ):
+        raise PermissionDenied('只能退回自己的报修。')
+    if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
+        messages.error(request, '只有待验收工单可以退回返修。')
+        return redirect('repair:work_order_detail', pk=work_order.pk)
+
+    if request.method == 'POST':
+        form = AcceptanceReturnForm(request.POST)
+        if form.is_valid():
+            reason = form.cleaned_data['reason'].strip()
+
+            with transaction.atomic():
+                locked_order = WorkOrder.objects.select_for_update().get(
+                    pk=work_order.pk
+                )
+                if locked_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
+                    messages.error(request, '工单状态已变化，请刷新后重试。')
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+
+                locked_order.status = WorkOrder.Status.REPAIRING
+                locked_order.return_count += 1
+                locked_order.save()
+                StatusLog.objects.create(
+                    work_order=locked_order,
+                    from_status=WorkOrder.Status.PENDING_ACCEPTANCE,
+                    to_status=WorkOrder.Status.REPAIRING,
+                    operator=request.user,
+                    remark=f'验收未通过，退回返修：{reason}',
+                )
+
+            messages.warning(
+                request,
+                '工单已退回维修，维修人员会继续处理。',
+            )
+            return redirect('repair:work_order_detail', pk=work_order.pk)
+    else:
+        form = AcceptanceReturnForm()
+
+    latest_record = work_order.repair_records.last()
+    return render(
+        request,
+        'repair/return_repair.html',
+        {
+            'work_order': work_order,
+            'form': form,
+            'latest_record': latest_record,
         },
     )
 

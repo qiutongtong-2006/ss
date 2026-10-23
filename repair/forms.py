@@ -282,3 +282,45 @@ class RepairCompletionForm(forms.Form):
             }
         ),
     )
+
+
+class AcceptanceEvaluationForm(forms.Form):
+    rating = forms.TypedChoiceField(
+        label='维修满意度',
+        choices=[
+            (5, '5 星 · 非常满意'),
+            (4, '4 星 · 满意'),
+            (3, '3 星 · 一般'),
+            (2, '2 星 · 不满意'),
+            (1, '1 星 · 很不满意'),
+        ],
+        coerce=int,
+        initial=5,
+        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+    )
+    comment = forms.CharField(
+        label='评价内容',
+        max_length=1000,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': '请描述维修效果、响应速度或需要改进的地方',
+            }
+        ),
+        help_text='评价提交后不能修改。',
+    )
+
+
+class AcceptanceReturnForm(forms.Form):
+    reason = forms.CharField(
+        label='退回原因',
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': '请说明故障仍然存在或尚未解决的问题',
+            }
+        ),
+    )

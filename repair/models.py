@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -147,6 +148,7 @@ class WorkOrder(models.Model):
     started_at = models.DateTimeField('开始维修时间', null=True, blank=True)
     completed_at = models.DateTimeField('完工时间', null=True, blank=True)
     verified_at = models.DateTimeField('验收时间', null=True, blank=True)
+    return_count = models.PositiveSmallIntegerField('退回返修次数', default=0)
     reject_reason = models.TextField('驳回原因', blank=True)
     cancel_reason = models.TextField('撤销原因', blank=True)
     created_at = models.DateTimeField('提交时间', auto_now_add=True)
@@ -258,6 +260,39 @@ class RepairRecord(models.Model):
 
     def __str__(self):
         return f'{self.work_order.order_no} 的维修记录'
+
+
+class Evaluation(models.Model):
+    work_order = models.OneToOneField(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name='evaluation',
+        verbose_name='工单',
+    )
+    student = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='evaluations',
+        verbose_name='评价学生',
+        limit_choices_to={'role': 'student'},
+    )
+    rating = models.PositiveSmallIntegerField(
+        '评分',
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    comment = models.TextField('评价内容', max_length=1000)
+    created_at = models.DateTimeField('评价时间', auto_now_add=True)
+
+    class Meta:
+        verbose_name = '验收评价'
+        verbose_name_plural = '验收评价'
+
+    @property
+    def star_display(self):
+        return f'{"★" * self.rating}{"☆" * (5 - self.rating)}'
+
+    def __str__(self):
+        return f'{self.work_order.order_no} - {self.rating} 星'
 
 
 class StatusLog(models.Model):

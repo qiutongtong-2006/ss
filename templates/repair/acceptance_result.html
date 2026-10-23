@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}验收并评价 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <span class="eyebrow">ACCEPTANCE &amp; REVIEW</span>
+    <h1 class="page-title mt-1 mb-2">验收并评价</h1>
+    <p class="page-subtitle mb-0">
+        工单 {{ work_order.order_no }} · {{ work_order.building.name }} {{ work_order.room_no }}
+    </p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">维修结果</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">故障描述</span>
+                    <span class="info-value">{{ work_order.description|linebreaksbr }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">维修人员</span>
+                    <span class="info-value">{{ work_order.repairer.real_name|default:work_order.repairer.username|default:"—" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">完工时间</span>
+                    <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+                {% if latest_record %}
+                    <div class="info-item">
+                        <span class="info-label">维修内容</span>
+                        <span class="info-value">{{ latest_record.repair_action|linebreaksbr }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">更换材料</span>
+                        <span class="info-value">{{ latest_record.materials_used|default:"未更换"|linebreaksbr }}</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card section-card">
+            <h2 class="section-title">确认修复并评价</h2>
+            <p class="text-muted small">
+                请先确认故障已经解决。评价提交后不能修改；如果问题仍未解决，请返回详情选择“退回返修”。
+            </p>
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <fieldset class="mb-4">
+                    <legend class="form-label fs-6">{{ form.rating.label }}</legend>
+                    <div class="rating-options">
+                        {% for radio in form.rating %}
+                            <div class="form-check rating-option">
+                                {{ radio.tag }}
+                                <label class="form-check-label" for="{{ radio.id_for_label }}">
+                                    {{ radio.choice_label }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% for error in form.rating.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </fieldset>
+
+                {% include 'repair/_field.html' with field=form.comment %}
+
+                <div class="alert alert-info mt-4 mb-0">
+                    提交后工单将变为“已完成”，本次维修评价会永久保留在工单详情中。
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+                    <button class="btn btn-success" type="submit"
+                            onclick="return confirm('确认维修已完成并提交评价吗？评价提交后不能修改。')">
+                        确认修复并提交评价
+                    </button>
+                    <a class="btn btn-outline-secondary"
+                       href="{% url 'repair:work_order_detail' work_order.pk %}">返回详情</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

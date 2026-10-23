@@ -15,6 +15,16 @@ urlpatterns = [
     path('repair/<int:pk>/accept/', views.accept_order, name='accept_order'),
     path('repair/<int:pk>/start/', views.start_repair, name='start_repair'),
     path('repair/<int:pk>/complete/', views.complete_repair, name='complete_repair'),
+    path(
+        'repair/<int:pk>/acceptance/',
+        views.acceptance_result,
+        name='acceptance_result',
+    ),
+    path(
+        'repair/<int:pk>/return/',
+        views.return_repair,
+        name='return_repair',
+    ),
     path('repair/<int:pk>/reject/', views.reject_order, name='reject_order'),
     path('repair/<int:pk>/cancel/', views.cancel_order, name='cancel_order'),
     path('repair/<int:pk>/', views.work_order_detail, name='work_order_detail'),
