@@ -520,8 +520,14 @@ class AcceptanceWorkflowTests(TestCase):
                 'returned': 1,
             },
         )
-        self.assertContains(response, '去验收')
+        self.assertContains(response, '去评价')
+        self.assertContains(response, '待评价')
         self.assertContains(response, '其中 1 单正在返修。')
+        content = response.content
+        self.assertLess(
+            content.find(b'class="quick-card primary"'),
+            content.find(b'class="student-summary-card '),
+        )
 
     def test_my_orders_links_pending_acceptance_directly_to_review(self):
         self.client.force_login(self.student)
