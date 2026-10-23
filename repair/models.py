@@ -121,6 +121,14 @@ class WorkOrder(models.Model):
     )
     description = models.TextField('故障描述')
     remark = models.TextField('备注', max_length=500, blank=True, default='')
+    fault_cause = models.TextField('故障原因', blank=True, default='')
+    repair_action = models.TextField('维修内容', blank=True, default='')
+    materials_used = models.CharField(
+        '更换材料',
+        max_length=500,
+        blank=True,
+        default='',
+    )
     allow_entry_without_student = models.BooleanField(
         '宿舍无人时同意在宿管陪同下进入',
         default=False,

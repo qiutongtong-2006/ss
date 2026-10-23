@@ -37,6 +37,12 @@
                            href="{% url 'repair:my_orders' %}">我的报修</a>
                     </li>
                 {% endif %}
+                {% if user.is_authenticated and user.role == 'repairer' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'repairer_orders' %}active{% endif %}"
+                           href="{% url 'repair:repairer_orders' %}">我的维修任务</a>
+                    </li>
+                {% endif %}
                 {% if user.is_authenticated and user.is_staff %}
                     {% if user.role == 'manager' %}
                         <li class="nav-item">

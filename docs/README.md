@@ -21,7 +21,7 @@
 - [x] 迭代 0：环境与清单就绪
 - [x] 迭代 1：学生注册登录与提交报修
 - [x] 迭代 2：宿管受理派单
-- [ ] 迭代 3：维修人员接单与维修记录（进行中）
+- [x] 迭代 3：维修人员接单与维修记录
 - [ ] 迭代 4：学生验收评价，主闭环打通
 - [ ] 迭代 5：权限加固与基础数据
 - [ ] 迭代 6：缓冲、缺陷修复与交付
@@ -39,6 +39,8 @@
 - [迭代 1 完成记录](迭代1-完成记录.md)
 - [迭代 2 计划](迭代2-计划.md)
 - [迭代 2 完成记录](迭代2-完成记录.md)
+- [迭代 3 计划](迭代3-计划.md)
+- [迭代 3 完成记录](迭代3-完成记录.md)
 - [UI 优化待办](UI优化待办.md)
 
 图表文件：
@@ -69,6 +71,10 @@ D:\code\ss
 
 # 检查项目
 .\.venv\Scripts\python.exe manage.py check --database default
+
+# 运行自动化测试（不依赖 MySQL 测试库创建权限）
+$env:DJANGO_SETTINGS_MODULE='ss.test_settings'
+.\.venv\Scripts\python.exe manage.py test repair -v 2
 
 # 生成迁移
 .\.venv\Scripts\python.exe manage.py makemigrations repair

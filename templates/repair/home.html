@@ -89,12 +89,20 @@
 {% else %}
     <div class="row g-4">
         <div class="col-md-6">
-            <div class="quick-card disabled">
+            <a class="quick-card primary" href="{% url 'repair:repairer_orders' %}">
                 <span class="quick-icon">修</span>
                 <span>
                     <span class="quick-title d-block">我的维修任务</span>
-                    <span class="quick-text d-block">查看派给自己的工单，接单并填写维修记录。</span>
-                    <span class="badge text-bg-light mt-2">迭代 3 上线</span>
+                    <span class="quick-text d-block">查看派给自己的工单，接单、填写维修记录并提交完工。</span>
+                </span>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <div class="quick-card">
+                <span class="quick-icon">流</span>
+                <span>
+                    <span class="quick-title d-block">维修流程</span>
+                    <span class="quick-text d-block">接单后工单进入维修中；提交完工后等待学生验收。</span>
                 </span>
             </div>
         </div>

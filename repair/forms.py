@@ -243,3 +243,42 @@ class AcceptOrderForm(forms.Form):
             is_active=True,
         ).order_by('username')
         self.fields['repairer'].widget.attrs['class'] = 'form-select'
+
+
+class RepairCompletionForm(forms.Form):
+    fault_cause = forms.CharField(
+        label='故障原因（选填）',
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': '例如：水龙头阀芯老化导致持续漏水',
+            }
+        ),
+    )
+    repair_action = forms.CharField(
+        label='维修内容（必填）',
+        max_length=2000,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': '请填写实际处理措施和维修结果',
+            }
+        ),
+        help_text='说明如何完成维修，作为本工单的维修记录。',
+    )
+    materials_used = forms.CharField(
+        label='更换材料（选填）',
+        required=False,
+        max_length=500,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': 2,
+                'placeholder': '例如：阀芯 1 个、密封圈 2 个；未更换材料可留空',
+            }
+        ),
+    )

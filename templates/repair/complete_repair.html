@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}填写维修记录 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero">
+    <span class="eyebrow">COMPLETE REPAIR</span>
+    <h1 class="page-title mt-1 mb-2">填写维修记录并提交完工</h1>
+    <p class="page-subtitle mb-0">
+        工单 {{ work_order.order_no }} · {{ work_order.building.name }} {{ work_order.room_no }}
+    </p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card section-card mb-4">
+            <h2 class="section-title">任务信息</h2>
+            <div class="info-list">
+                <div class="info-item">
+                    <span class="info-label">报修学生</span>
+                    <span class="info-value">{{ work_order.student.real_name|default:work_order.student.username }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">联系电话</span>
+                    <span class="info-value">{{ work_order.contact_phone }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">故障描述</span>
+                    <span class="info-value">{{ work_order.description|linebreaksbr }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">接单时间</span>
+                    <span class="info-value">{{ work_order.started_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card section-card">
+            <h2 class="section-title">维修记录</h2>
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% include 'repair/_field.html' with field=form.fault_cause %}
+                {% include 'repair/_field.html' with field=form.repair_action %}
+                {% include 'repair/_field.html' with field=form.materials_used %}
+
+                <div class="alert alert-info mt-4 mb-0">
+                    提交后工单状态将变为“待验收”，维修记录会保留在工单详情中。
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2 mt-4">
+                    <button class="btn btn-primary" type="submit">提交完工</button>
+                    <a class="btn btn-outline-secondary"
+                       href="{% url 'repair:work_order_detail' work_order.pk %}">返回任务详情</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

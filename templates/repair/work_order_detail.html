@@ -86,6 +86,26 @@
             </div>
         {% endif %}
 
+        {% if work_order.fault_cause or work_order.repair_action or work_order.materials_used %}
+            <div class="card section-card mb-4">
+                <h2 class="section-title">维修记录</h2>
+                <div class="info-list">
+                    <div class="info-item">
+                        <span class="info-label">故障原因</span>
+                        <span class="info-value">{{ work_order.fault_cause|default:"未填写"|linebreaksbr }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">维修内容</span>
+                        <span class="info-value">{{ work_order.repair_action|default:"未填写"|linebreaksbr }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">更换材料</span>
+                        <span class="info-value">{{ work_order.materials_used|default:"未更换"|linebreaksbr }}</span>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         <div class="card section-card">
             <h2 class="section-title">现场照片</h2>
             <div class="photo-gallery">
@@ -146,6 +166,10 @@
                     <span class="info-value">{{ work_order.assigned_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
                 <div class="info-item">
+                    <span class="info-label">开始维修时间</span>
+                    <span class="info-value">{{ work_order.started_at|date:"Y-m-d H:i"|default:"—" }}</span>
+                </div>
+                <div class="info-item">
                     <span class="info-label">完工时间</span>
                     <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
@@ -173,8 +197,16 @@
                     <a class="btn btn-outline-danger"
                        href="{% url 'repair:reject_order' work_order.pk %}">驳回报修</a>
                 </div>
-            {% elif can_repair %}
-                <button class="btn btn-primary w-100" type="button" disabled>接单（迭代 3 开放）</button>
+            {% elif can_start_repair %}
+                <form method="post" action="{% url 'repair:start_repair' work_order.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-primary w-100" type="submit">接单并开始维修</button>
+                </form>
+                <p class="form-text mb-0 mt-2">接单后工单状态将变为“维修中”。</p>
+            {% elif can_complete_repair %}
+                <a class="btn btn-primary w-100"
+                   href="{% url 'repair:complete_repair' work_order.pk %}">填写维修记录并提交完工</a>
+                <p class="form-text mb-0 mt-2">提交后工单将等待学生验收。</p>
             {% else %}
                 <p class="text-muted small mb-0">当前角色或工单状态下没有可执行操作。</p>
             {% endif %}
@@ -187,6 +219,8 @@
                 <a class="btn btn-outline-primary w-100" href="{% url 'repair:my_orders' %}">返回我的报修</a>
             {% elif user.role == 'manager' %}
                 <a class="btn btn-outline-primary w-100" href="{% url 'repair:manager_orders' %}">返回工单池</a>
+            {% elif user.role == 'repairer' %}
+                <a class="btn btn-outline-primary w-100" href="{% url 'repair:repairer_orders' %}">返回我的维修任务</a>
             {% else %}
                 <a class="btn btn-outline-primary w-100" href="{% url 'repair:home' %}">返回首页</a>
             {% endif %}

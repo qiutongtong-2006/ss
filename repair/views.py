@@ -12,6 +12,7 @@ from .filters import filter_work_orders
 from .forms import (
     AcceptOrderForm,
     CancelOrderForm,
+    RepairCompletionForm,
     RejectOrderForm,
     StudentRegistrationForm,
     WorkOrderSubmitForm,
@@ -63,6 +64,40 @@ def my_orders(request):
         {
             'work_orders': work_orders,
             'filter_form': filter_form,
+        },
+    )
+
+
+@login_required
+def repairer_orders(request):
+    """维修人员查看派给自己的任务。"""
+    if request.user.role != User.Role.REPAIRER:
+        raise PermissionDenied('只有维修人员可以查看“我的维修任务”。')
+
+    queryset = WorkOrder.objects.filter(repairer=request.user).select_related(
+        'student',
+        'building',
+        'category',
+        'repairer',
+    )
+    work_orders, filter_form = filter_work_orders(queryset, request.GET)
+    summary = queryset.aggregate(
+        total=Count('id'),
+        assigned=Count('id', filter=Q(status=WorkOrder.Status.ASSIGNED)),
+        repairing=Count('id', filter=Q(status=WorkOrder.Status.REPAIRING)),
+        pending_acceptance=Count(
+            'id',
+            filter=Q(status=WorkOrder.Status.PENDING_ACCEPTANCE),
+        ),
+        completed=Count('id', filter=Q(status=WorkOrder.Status.COMPLETED)),
+    )
+    return render(
+        request,
+        'repair/repairer_orders.html',
+        {
+            'work_orders': work_orders,
+            'filter_form': filter_form,
+            'summary': summary,
         },
     )
 
@@ -205,10 +240,122 @@ def work_order_detail(request, pk):
                 is_manager
                 and work_order.status == WorkOrder.Status.PENDING
             ),
-            'can_repair': (
+            'can_start_repair': (
                 is_repairer_assigned
                 and work_order.status == WorkOrder.Status.ASSIGNED
             ),
+            'can_complete_repair': (
+                is_repairer_assigned
+                and work_order.status == WorkOrder.Status.REPAIRING
+            ),
+        },
+    )
+
+
+@login_required
+@require_POST
+def start_repair(request, pk):
+    """维修人员接单，将工单从已派单转为维修中。"""
+    if request.user.role != User.Role.REPAIRER:
+        raise PermissionDenied('只有维修人员可以接单。')
+
+    work_order = get_object_or_404(WorkOrder, pk=pk)
+    if work_order.repairer_id != request.user.id:
+        raise PermissionDenied('不能接未派给自己的工单。')
+    if work_order.status != WorkOrder.Status.ASSIGNED:
+        messages.error(request, '只有已派单工单可以接单。')
+        return redirect('repair:work_order_detail', pk=work_order.pk)
+
+    with transaction.atomic():
+        locked_order = WorkOrder.objects.select_for_update().get(pk=work_order.pk)
+        if locked_order.status != WorkOrder.Status.ASSIGNED:
+            messages.error(request, '工单状态已变化，请刷新后重试。')
+            return redirect('repair:work_order_detail', pk=locked_order.pk)
+
+        locked_order.status = WorkOrder.Status.REPAIRING
+        locked_order.started_at = timezone.now()
+        locked_order.save()
+        StatusLog.objects.create(
+            work_order=locked_order,
+            from_status=WorkOrder.Status.ASSIGNED,
+            to_status=WorkOrder.Status.REPAIRING,
+            operator=request.user,
+            remark='维修人员接单，开始维修',
+        )
+
+    messages.success(request, '接单成功，请完成维修后填写维修记录。')
+    return redirect('repair:work_order_detail', pk=work_order.pk)
+
+
+@login_required
+def complete_repair(request, pk):
+    """维修人员填写维修记录并提交完工。"""
+    if request.user.role != User.Role.REPAIRER:
+        raise PermissionDenied('只有维修人员可以提交完工。')
+
+    work_order = get_object_or_404(WorkOrder, pk=pk)
+    if work_order.repairer_id != request.user.id:
+        raise PermissionDenied('不能提交未派给自己的工单。')
+    if work_order.status != WorkOrder.Status.REPAIRING:
+        messages.error(request, '只有维修中的工单可以填写维修记录并提交完工。')
+        return redirect('repair:work_order_detail', pk=work_order.pk)
+
+    if request.method == 'POST':
+        form = RepairCompletionForm(request.POST)
+        if form.is_valid():
+            fault_cause = form.cleaned_data['fault_cause'].strip()
+            repair_action = form.cleaned_data['repair_action'].strip()
+            materials_used = form.cleaned_data['materials_used'].strip()
+            now = timezone.now()
+
+            with transaction.atomic():
+                locked_order = WorkOrder.objects.select_for_update().get(
+                    pk=work_order.pk
+                )
+                if locked_order.status != WorkOrder.Status.REPAIRING:
+                    messages.error(request, '工单状态已变化，请刷新后重试。')
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+
+                locked_order.fault_cause = fault_cause
+                locked_order.repair_action = repair_action
+                locked_order.materials_used = materials_used
+                locked_order.status = WorkOrder.Status.PENDING_ACCEPTANCE
+                locked_order.completed_at = now
+                locked_order.save()
+
+                remark_parts = [f'维修内容：{repair_action}']
+                if fault_cause:
+                    remark_parts.insert(0, f'故障原因：{fault_cause}')
+                if materials_used:
+                    remark_parts.append(f'更换材料：{materials_used}')
+                StatusLog.objects.create(
+                    work_order=locked_order,
+                    from_status=WorkOrder.Status.REPAIRING,
+                    to_status=WorkOrder.Status.PENDING_ACCEPTANCE,
+                    operator=request.user,
+                    remark='；'.join(remark_parts),
+                )
+
+            messages.success(request, '维修记录已保存，工单已提交完工并等待学生验收。')
+            return redirect('repair:work_order_detail', pk=work_order.pk)
+    else:
+        form = RepairCompletionForm(
+            initial={
+                'fault_cause': work_order.fault_cause,
+                'repair_action': work_order.repair_action,
+                'materials_used': work_order.materials_used,
+            }
+        )
+
+    return render(
+        request,
+        'repair/complete_repair.html',
+        {
+            'work_order': work_order,
+            'form': form,
         },
     )
 

@@ -56,9 +56,18 @@ class WorkOrderAdmin(admin.ModelAdmin):
         'allow_entry_without_student',
         'category',
         'status',
+        'repairer',
+        'started_at',
+        'completed_at',
         'created_at',
     )
-    list_filter = ('status', 'building', 'category', 'allow_entry_without_student')
+    list_filter = (
+        'status',
+        'building',
+        'category',
+        'repairer',
+        'allow_entry_without_student',
+    )
     search_fields = (
         'order_no',
         'student__username',
@@ -67,7 +76,16 @@ class WorkOrderAdmin(admin.ModelAdmin):
         'contact_phone',
         'repair_address',
         'remark',
+        'repairer__username',
+        'repairer__real_name',
+        'repair_action',
     )
-    readonly_fields = ('order_no', 'created_at', 'updated_at')
+    readonly_fields = (
+        'order_no',
+        'started_at',
+        'completed_at',
+        'created_at',
+        'updated_at',
+    )
     date_hierarchy = 'created_at'
     inlines = [WorkOrderImageInline, StatusLogInline]

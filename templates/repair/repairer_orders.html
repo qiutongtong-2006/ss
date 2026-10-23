@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}我的维修任务 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero d-flex flex-column flex-sm-row justify-content-between align-items-sm-end gap-3">
+    <div>
+        <span class="eyebrow">MY REPAIR TASKS</span>
+        <h1 class="page-title mt-1 mb-2">我的维修任务</h1>
+        <p class="page-subtitle mb-0">这里只显示派给当前维修人员的工单，可按状态、楼栋和类别筛选。</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{% url 'repair:repairer_orders' %}">刷新任务</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">全部任务</div>
+            <div class="h3 mb-0">{{ summary.total }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">待接单</div>
+            <div class="h3 mb-0 text-info">{{ summary.assigned }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">维修中</div>
+            <div class="h3 mb-0 text-primary">{{ summary.repairing }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">待验收</div>
+            <div class="h3 mb-0 text-dark">{{ summary.pending_acceptance }}</div>
+        </div>
+    </div>
+    <div class="col-6 col-lg">
+        <div class="card section-card text-center h-100">
+            <div class="text-muted small">已完成</div>
+            <div class="h3 mb-0 text-success">{{ summary.completed }}</div>
+        </div>
+    </div>
+</div>
+
+{% include 'repair/_order_filters.html' %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="section-title mb-0">任务列表</h2>
+    <span class="text-muted small">当前 {{ work_orders|length }} 条</span>
+</div>
+
+<div class="card section-card">
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>工单号</th>
+                    <th>学生 / 联系方式</th>
+                    <th>位置</th>
+                    <th>类别</th>
+                    <th>状态</th>
+                    <th>约定上门</th>
+                    <th class="text-end">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in work_orders %}
+                    <tr>
+                        <td><strong>{{ order.order_no }}</strong></td>
+                        <td>
+                            {{ order.student.real_name|default:order.student.username }}
+                            <div class="text-muted small">{{ order.contact_phone }}</div>
+                        </td>
+                        <td>
+                            {{ order.building.name }} {{ order.room_no }}
+                            {% if order.repair_address %}
+                                <div class="text-muted small">{{ order.repair_address }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ order.category.name }}</td>
+                        <td>
+                            <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                        </td>
+                        <td class="text-muted">
+                            {% if order.appointment_at %}
+                                {{ order.appointment_at|date:"m-d H:i" }}
+                            {% else %}
+                                未约定
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{% url 'repair:work_order_detail' order.pk %}">查看任务</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="text-center py-5">
+                                <div class="quick-icon mx-auto mb-3">修</div>
+                                <h3 class="h6">当前没有符合条件的维修任务</h3>
+                                <p class="text-muted small mb-3">等待宿管派单，或清除筛选条件后再查看。</p>
+                                <a class="btn btn-outline-primary" href="{% url 'repair:repairer_orders' %}">重置任务列表</a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
