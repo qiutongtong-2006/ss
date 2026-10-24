@@ -21,6 +21,7 @@ from .forms import (
 )
 from .models import (
     Evaluation,
+    OPEN_WORK_ORDER_STATUSES,
     RepairRecord,
     StatusLog,
     User,
@@ -69,6 +70,11 @@ def register(request):
 @login_required
 def home(request):
     """登录后的首页，按角色显示不同入口。"""
+    if request.user.role not in User.Role.values:
+        logout(request)
+        messages.error(request, '账号角色配置异常，请联系宿管或系统管理员。')
+        return redirect('repair:login')
+
     student_summary = None
     if request.user.role == User.Role.STUDENT:
         student_summary = WorkOrder.objects.filter(
@@ -233,9 +239,32 @@ def submit_repair(request):
     if request.method == 'POST':
         form = WorkOrderSubmitForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
+            building = form.cleaned_data['building']
+            room_no = form.cleaned_data['room_no']
+            category = form.cleaned_data['category']
+            duplicate_orders = WorkOrder.objects.filter(
+                building=building,
+                room_no=room_no,
+                category=category,
+                status__in=OPEN_WORK_ORDER_STATUSES,
+            )
+            duplicate_count = duplicate_orders.count()
+            if (
+                duplicate_count
+                and request.POST.get('confirm_duplicate') != '1'
+            ):
+                return render(
+                    request,
+                    'repair/submit_repair.html',
+                    {
+                        'form': form,
+                        'duplicate_count': duplicate_count,
+                    },
+                )
+
             work_order = form.save(commit=False)
             work_order.student = request.user
-            work_order.building = form.cleaned_data['building']
+            work_order.building = building
             with transaction.atomic():
                 work_order.save()
                 for image in form.cleaned_data['images']:
@@ -663,11 +692,23 @@ def reject_order(request, pk):
         if form.is_valid():
             reason = form.cleaned_data['reason']
             with transaction.atomic():
-                work_order.status = WorkOrder.Status.REJECTED
-                work_order.reject_reason = reason
-                work_order.save()
+                locked_order = WorkOrder.objects.select_for_update().get(
+                    pk=work_order.pk
+                )
+                if locked_order.status != WorkOrder.Status.PENDING:
+                    messages.error(
+                        request,
+                        '工单状态已变化，无法驳回。',
+                    )
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+                locked_order.status = WorkOrder.Status.REJECTED
+                locked_order.reject_reason = reason
+                locked_order.save()
                 StatusLog.objects.create(
-                    work_order=work_order,
+                    work_order=locked_order,
                     from_status=WorkOrder.Status.PENDING,
                     to_status=WorkOrder.Status.REJECTED,
                     operator=request.user,
@@ -699,11 +740,23 @@ def cancel_order(request, pk):
         if form.is_valid():
             reason = form.cleaned_data.get('reason', '')
             with transaction.atomic():
-                work_order.status = WorkOrder.Status.CANCELLED
-                work_order.cancel_reason = reason
-                work_order.save()
+                locked_order = WorkOrder.objects.select_for_update().get(
+                    pk=work_order.pk
+                )
+                if locked_order.status != WorkOrder.Status.PENDING:
+                    messages.error(
+                        request,
+                        '工单状态已变化，无法撤销。',
+                    )
+                    return redirect(
+                        'repair:work_order_detail',
+                        pk=locked_order.pk,
+                    )
+                locked_order.status = WorkOrder.Status.CANCELLED
+                locked_order.cancel_reason = reason
+                locked_order.save()
                 StatusLog.objects.create(
-                    work_order=work_order,
+                    work_order=locked_order,
                     from_status=WorkOrder.Status.PENDING,
                     to_status=WorkOrder.Status.CANCELLED,
                     operator=request.user,

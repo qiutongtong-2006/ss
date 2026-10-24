@@ -2,6 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from . import views
+from .forms import SystemAuthenticationForm
 
 app_name = 'repair'
 
@@ -30,7 +31,10 @@ urlpatterns = [
     path('repair/<int:pk>/', views.work_order_detail, name='work_order_detail'),
     path(
         'login/',
-        auth_views.LoginView.as_view(template_name='repair/login.html'),
+        auth_views.LoginView.as_view(
+            template_name='repair/login.html',
+            authentication_form=SystemAuthenticationForm,
+        ),
         name='login',
     ),
     path('logout/', views.logout_view, name='logout'),

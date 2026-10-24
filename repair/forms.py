@@ -1,7 +1,19 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from .models import Building, RepairCategory, User, WorkOrder
+
+
+class SystemAuthenticationForm(AuthenticationForm):
+    """阻止角色配置异常的历史账号登录前台。"""
+
+    def confirm_login_allowed(self, user):
+        super().confirm_login_allowed(user)
+        if user.role not in User.Role.values:
+            raise forms.ValidationError(
+                '账号角色配置异常，请联系宿管或系统管理员。',
+                code='invalid_role',
+            )
 
 
 class StudentRegistrationForm(UserCreationForm):

@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from .utils import normalize_building_name
@@ -27,6 +27,11 @@ class User(AbstractUser):
     class Meta:
         verbose_name = '用户'
         verbose_name_plural = '用户'
+
+    def clean(self):
+        super().clean()
+        if self.role not in self.Role.values:
+            raise ValidationError({'role': '账号角色配置无效。'})
 
     def __str__(self):
         return f'{self.real_name or self.username}（{self.get_role_display()}）'
@@ -76,17 +81,45 @@ class RepairCategory(models.Model):
         return self.name
 
 
+class WorkOrderSequence(models.Model):
+    service_date = models.DateField('业务日期', unique=True)
+    last_value = models.PositiveIntegerField('最后序号', default=0)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '工单序号'
+        verbose_name_plural = '工单序号'
+
+    def __str__(self):
+        return f'{self.service_date:%Y-%m-%d}: {self.last_value}'
+
+
+@transaction.atomic
 def generate_order_no():
-    """生成 BX + 日期 + 四位序号 的工单号。"""
-    date_part = timezone.localdate().strftime('%Y%m%d')
+    """按业务日期加锁生成唯一工单序号。"""
+    service_date = timezone.localdate()
+    date_part = service_date.strftime('%Y%m%d')
     prefix = f'BX{date_part}'
     last_order = (
         WorkOrder.objects.filter(order_no__startswith=prefix)
         .order_by('-order_no')
         .first()
     )
-    sequence = int(last_order.order_no[-4:]) + 1 if last_order else 1
-    return f'{prefix}{sequence:04d}'
+    existing_max = 0
+    if last_order is not None:
+        suffix = last_order.order_no[len(prefix):]
+        if suffix.isdigit():
+            existing_max = int(suffix)
+
+    sequence, _ = WorkOrderSequence.objects.get_or_create(
+        service_date=service_date,
+        defaults={'last_value': existing_max},
+    )
+    sequence = WorkOrderSequence.objects.select_for_update().get(pk=sequence.pk)
+    next_value = max(sequence.last_value, existing_max) + 1
+    sequence.last_value = next_value
+    sequence.save(update_fields=('last_value', 'updated_at'))
+    return f'{prefix}{next_value:04d}'
 
 
 class WorkOrder(models.Model):
@@ -206,6 +239,14 @@ class WorkOrder(models.Model):
             return flow.index(self.status)
         except ValueError:
             return -1
+
+
+OPEN_WORK_ORDER_STATUSES = (
+    WorkOrder.Status.PENDING,
+    WorkOrder.Status.ASSIGNED,
+    WorkOrder.Status.REPAIRING,
+    WorkOrder.Status.PENDING_ACCEPTANCE,
+)
 
 
 class WorkOrderImage(models.Model):
