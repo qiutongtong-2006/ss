@@ -30,7 +30,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl">
         <div class="report-kpi primary">
             <span class="report-kpi-icon">量</span>
             <span class="report-kpi-label">报修总量</span>
@@ -38,7 +38,7 @@
             <small>所选时间范围内的全部工单</small>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl">
         <div class="report-kpi success">
             <span class="report-kpi-icon">成</span>
             <span class="report-kpi-label">已完成</span>
@@ -46,7 +46,7 @@
             <small>已完成验收并归档的工单</small>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl">
         <div class="report-kpi warning">
             <span class="report-kpi-icon">办</span>
             <span class="report-kpi-label">处理中</span>
@@ -54,12 +54,20 @@
             <small>待受理、已派单、维修中、待验收</small>
         </div>
     </div>
-    <div class="col-sm-6 col-xl-3">
+    <div class="col-sm-6 col-xl">
         <div class="report-kpi accent">
             <span class="report-kpi-icon">率</span>
             <span class="report-kpi-label">完成率</span>
             <strong class="report-kpi-value">{{ completion_rate|floatformat:1 }}<span>%</span></strong>
             <small>已完成数量 ÷ 报修总量</small>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl">
+        <div class="report-kpi danger">
+            <span class="report-kpi-icon">超</span>
+            <span class="report-kpi-label">超时未受理</span>
+            <strong class="report-kpi-value">{{ overdue }}</strong>
+            <small>提交超过 24 小时仍未受理</small>
         </div>
     </div>
 </div>

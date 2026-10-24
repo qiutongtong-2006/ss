@@ -3,12 +3,22 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Case, Count, F, IntegerField, Q, Value, When
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    F,
+    IntegerField,
+    Q,
+    Value,
+    When,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .filters import STUDENT_PROCESSING_STATUSES, filter_work_orders
+from .deadlines import unaccepted_overdue_cutoff
 from .forms import (
     AcceptanceEvaluationForm,
     AcceptanceReturnForm,
@@ -198,17 +208,36 @@ def repairer_orders(request):
 @role_required(User.Role.MANAGER, allow_superuser=True)
 def manager_orders(request):
     """宿管工单池，默认显示待受理工单。"""
+    overdue_cutoff = unaccepted_overdue_cutoff()
     params = request.GET.copy()
     if 'status' not in params:
         params['status'] = WorkOrder.Status.PENDING
 
-    queryset = WorkOrder.objects.select_related(
-        'student',
-        'building',
-        'category',
-        'repairer',
+    queryset = (
+        WorkOrder.objects.select_related(
+            'student',
+            'building',
+            'category',
+            'repairer',
+        )
+        .annotate(
+            is_overdue=Case(
+                When(
+                    status=WorkOrder.Status.PENDING,
+                    created_at__lt=overdue_cutoff,
+                    then=Value(True),
+                ),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        )
     )
-    work_orders, filter_form = filter_work_orders(queryset, params)
+    work_orders, filter_form = filter_work_orders(
+        queryset,
+        params,
+        include_overdue=True,
+        overdue_cutoff=overdue_cutoff,
+    )
     page_obj, filter_query = paginate_work_orders(work_orders, params)
     summary = WorkOrder.objects.aggregate(
         total=Count('id'),
@@ -218,6 +247,13 @@ def manager_orders(request):
         pending_acceptance=Count(
             'id',
             filter=Q(status=WorkOrder.Status.PENDING_ACCEPTANCE),
+        ),
+        overdue=Count(
+            'id',
+            filter=Q(
+                status=WorkOrder.Status.PENDING,
+                created_at__lt=overdue_cutoff,
+            ),
         ),
     )
 

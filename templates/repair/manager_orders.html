@@ -12,6 +12,18 @@
     <a class="btn btn-outline-primary" href="{% url 'repair:manager_orders' %}">刷新工单池</a>
 </div>
 
+{% if summary.overdue %}
+    <div class="alert alert-danger overdue-alert d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3"
+         role="alert">
+        <div>
+            <strong>有 {{ summary.overdue }} 条报修超过 24 小时仍未受理。</strong>
+            <div class="small mt-1">请优先查看并安排受理。</div>
+        </div>
+        <a class="btn btn-danger btn-sm text-nowrap"
+           href="{% url 'repair:manager_orders' %}?status=overdue">查看超时工单</a>
+    </div>
+{% endif %}
+
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg">
         <div class="card section-card text-center h-100">
@@ -79,6 +91,9 @@
                         <td>{{ order.category.name }}</td>
                         <td>
                             <span class="badge text-bg-{{ order.status_color }}">{{ order.get_status_display }}</span>
+                            {% if order.is_overdue %}
+                                <span class="badge text-bg-danger ms-1">超时未受理</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if order.allow_entry_without_student %}

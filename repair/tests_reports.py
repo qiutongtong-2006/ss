@@ -153,7 +153,7 @@ class ReportDashboardTests(TestCase):
         self.assertContains(response, '报修分类占比饼图')
         self.assertContains(response, 'conic-gradient(')
         self.assertContains(response, 'report-pie-legend')
-        self.assertContains(response, 'css/app.css?v=20261024-report-pie')
+        self.assertContains(response, 'css/app.css?v=20261024-overdue')
         self.assertNotContains(response, 'echarts.min.js')
         self.assertEqual(
             response.context['category_rows'][0]['start_percentage'],

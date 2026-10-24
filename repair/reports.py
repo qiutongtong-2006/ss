@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from .deadlines import unaccepted_overdue_cutoff
 from .models import OPEN_WORK_ORDER_STATUSES, WorkOrder
 
 
@@ -74,10 +75,18 @@ def build_report(range_key='7d'):
             'id',
             filter=Q(status__in=OPEN_WORK_ORDER_STATUSES),
         ),
+        overdue=Count(
+            'id',
+            filter=Q(
+                status=WorkOrder.Status.PENDING,
+                created_at__lt=unaccepted_overdue_cutoff(),
+            ),
+        ),
     )
     total = summary['total']
     completed = summary['completed']
     processing = summary['processing']
+    overdue = summary['overdue']
     completion_rate = round(completed * 100 / total, 1) if total else 0.0
 
     category_rows = []
@@ -120,6 +129,7 @@ def build_report(range_key='7d'):
         'total': total,
         'completed': completed,
         'processing': processing,
+        'overdue': overdue,
         'completion_rate': completion_rate,
         'category_rows': category_rows,
         'generated_at': timezone.now(),

@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -77,6 +78,19 @@ def run():
             description='MySQL统计报表处理中工单。',
             status=WorkOrder.Status.PENDING,
         )
+        overdue_order = WorkOrder.objects.create(
+            order_no=f'RPT{stamp}C',
+            student=student,
+            building=building,
+            room_no='903',
+            contact_phone='13800000000',
+            category=category_pending,
+            description='MySQL统计报表超时未受理工单。',
+            status=WorkOrder.Status.PENDING,
+        )
+        WorkOrder.objects.filter(pk=overdue_order.pk).update(
+            created_at=timezone.now() - timedelta(hours=25)
+        )
         after = build_report('all')
         category_totals = {
             row['name']: row['total'] for row in after['category_rows']
@@ -88,16 +102,32 @@ def run():
             reverse('repair:report_dashboard'),
             {'range': 'all'},
         )
+        manager_pool = client.get(reverse('repair:manager_orders'))
+        overdue_filter = client.get(
+            reverse('repair:manager_orders'),
+            {
+                'status': 'overdue',
+                'building': building.pk,
+                'category': category_pending.pk,
+                'q': overdue_order.order_no,
+            },
+        )
         client.force_login(student)
         student_denied = client.get(reverse('repair:report_dashboard'))
 
-        assert after['total'] == before['total'] + 2
+        assert after['total'] == before['total'] + 3
         assert after['completed'] == before['completed'] + 1
-        assert after['processing'] == before['processing'] + 1
+        assert after['processing'] == before['processing'] + 2
+        assert after['overdue'] == before['overdue'] + 1
         assert category_totals[category_completed.name] >= 1
         assert category_totals[category_pending.name] >= 1
         assert report_page.status_code == 200
         assert report_page.content.count(b'RPT') == 0
+        assert '超时未受理'.encode() in report_page.content
+        assert manager_pool.status_code == 200
+        assert '超过 24 小时仍未受理'.encode() in manager_pool.content
+        assert overdue_filter.status_code == 200
+        assert overdue_order.order_no.encode() in overdue_filter.content
         assert student_denied.status_code == 403
         assert WorkOrder.objects.filter(
             pk=completed_order.pk
@@ -105,9 +135,9 @@ def run():
         assert WorkOrder.objects.filter(pk=pending_order.pk).exists()
 
         print(
-            '报修总量 +2 | 已完成 +1 | 处理中 +1 | 停用分类保留'
+            '报修总量 +3 | 已完成 +1 | 处理中 +2 | 超时未受理 +1'
         )
-        print('宿管报表页=200 | 学生访问=403 | 页面不暴露工单号')
+        print('宿管报表页=200 | 红色提醒可见 | 超时筛选命中 | 学生访问=403')
         transaction.set_rollback(True)
 
     print('MySQL 统计报表验证通过，临时数据已回滚。')

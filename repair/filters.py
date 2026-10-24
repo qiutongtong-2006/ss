@@ -1,6 +1,7 @@
 from django import forms
 from django.db.models import Q
 
+from .deadlines import unaccepted_overdue_cutoff
 from .models import Building, RepairCategory, WorkOrder
 
 DEFAULT_ACTIVE_STATUSES = (
@@ -44,14 +45,20 @@ class WorkOrderFilterForm(forms.Form):
         self,
         *args,
         include_active=False,
+        include_overdue=False,
         active_label='当前任务',
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+        special_choices = []
         if include_active:
+            special_choices.append(('active', active_label))
+        if include_overdue:
+            special_choices.append(('overdue', '超时未受理'))
+        if special_choices:
             self.fields['status'].choices = [
                 ('', '全部状态'),
-                ('active', active_label),
+                *special_choices,
                 *WorkOrder.Status.choices,
             ]
         self.fields['building'].queryset = Building.objects.all().order_by('name')
@@ -66,13 +73,16 @@ def filter_work_orders(
     queryset,
     data=None,
     include_active=False,
+    include_overdue=False,
     active_label='当前任务',
     active_statuses=None,
+    overdue_cutoff=None,
 ):
     """按 GET 参数过滤工单，返回过滤后的查询集和绑定后的表单。"""
     form = WorkOrderFilterForm(
         data or None,
         include_active=include_active,
+        include_overdue=include_overdue,
         active_label=active_label,
     )
     if form.is_valid():
@@ -84,6 +94,13 @@ def filter_work_orders(
         if status == 'active':
             queryset = queryset.filter(
                 status__in=active_statuses or DEFAULT_ACTIVE_STATUSES
+            )
+        elif status == 'overdue':
+            queryset = queryset.filter(
+                status=WorkOrder.Status.PENDING,
+                created_at__lt=(
+                    overdue_cutoff or unaccepted_overdue_cutoff()
+                ),
             )
         elif status:
             queryset = queryset.filter(status=status)
