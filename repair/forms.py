@@ -1,8 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import RepairCategory, User, WorkOrder
-from .utils import normalize_building_name
+from .models import Building, RepairCategory, User, WorkOrder
 
 
 class StudentRegistrationForm(UserCreationForm):
@@ -55,17 +54,11 @@ class MultipleImageField(forms.ImageField):
 
 
 class WorkOrderSubmitForm(forms.ModelForm):
-    building_name = forms.CharField(
+    building = forms.ModelChoiceField(
         label='楼栋',
-        max_length=50,
-        widget=forms.TextInput(
-            attrs={
-                'class': 'form-control',
-                'placeholder': '例如 5号楼',
-                'list': 'building-options',
-            }
-        ),
-        help_text='可以直接填写新楼栋；二号楼、2栋等写法会自动统一为 2号楼。',
+        queryset=Building.objects.none(),
+        empty_label='请选择楼栋',
+        help_text='楼栋由宿管在管理后台统一维护。',
     )
     repair_address = forms.CharField(
         label='维修地址',
@@ -125,7 +118,7 @@ class WorkOrderSubmitForm(forms.ModelForm):
             'allow_entry_without_student',
         )
         field_order = [
-            'building_name',
+            'building',
             'room_no',
             'repair_address',
             'contact_phone',
@@ -146,6 +139,10 @@ class WorkOrderSubmitForm(forms.ModelForm):
         self.user = user
         if user and not self.is_bound:
             self.initial.setdefault('contact_phone', user.phone)
+        self.fields['building'].queryset = Building.objects.filter(
+            is_active=True
+        ).order_by('name')
+        self.fields['building'].widget.attrs['class'] = 'form-select'
         self.fields['category'].queryset = RepairCategory.objects.filter(is_active=True)
         self.fields['category'].empty_label = '请选择报修类别'
         self.fields['category'].widget.attrs['class'] = 'form-select'
@@ -159,12 +156,6 @@ class WorkOrderSubmitForm(forms.ModelForm):
                 'placeholder': '请描述故障现象、位置和方便上门的时间',
             }
         )
-
-    def clean_building_name(self):
-        building_name = self.cleaned_data['building_name'].strip()
-        if not building_name:
-            raise forms.ValidationError('请填写楼栋。')
-        return normalize_building_name(building_name)
 
     def clean_images(self):
         images = self.cleaned_data.get('images', [])

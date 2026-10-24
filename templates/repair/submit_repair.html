@@ -11,12 +11,6 @@
 
 <form method="post" enctype="multipart/form-data" novalidate>
     {% csrf_token %}
-    <datalist id="building-options">
-        {% for building in building_options %}
-            <option value="{{ building.name }}"></option>
-        {% endfor %}
-    </datalist>
-
     {% if form.non_field_errors %}
         <div class="alert alert-danger">{{ form.non_field_errors }}</div>
     {% endif %}
@@ -24,7 +18,7 @@
     <div class="card section-card mb-4">
         <h2 class="section-title">报修信息</h2>
         <div class="row g-3">
-            {% include 'repair/_field.html' with field=form.building_name col_class='col-md-4' %}
+            {% include 'repair/_field.html' with field=form.building col_class='col-md-4' %}
             {% include 'repair/_field.html' with field=form.room_no col_class='col-md-4' %}
             {% include 'repair/_field.html' with field=form.contact_phone col_class='col-md-4' %}
             {% include 'repair/_field.html' with field=form.category col_class='col-md-6' %}

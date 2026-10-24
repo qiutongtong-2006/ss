@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.db.models import Count
 
 from .models import (
     Building,
@@ -26,18 +27,49 @@ class UserAdmin(BaseUserAdmin):
     search_fields = ('username', 'real_name', 'phone')
 
 
-@admin.register(Building)
-class BuildingAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active', 'created_at')
+class BasicDataAdminMixin:
+    """展示基础数据引用量，并保护已被工单引用的数据。"""
+
+    list_display = ('name', 'is_active', 'related_work_order_count', 'created_at')
     list_filter = ('is_active',)
     search_fields = ('name',)
+    list_editable = ('is_active',)
+    list_display_links = ('name',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            work_order_count=Count('workorder', distinct=True)
+        )
+
+    @admin.display(description='关联工单', ordering='work_order_count')
+    def related_work_order_count(self, obj):
+        return obj.work_order_count
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.workorder_set.exists():
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop('delete_selected', None)
+        return actions
+
+
+@admin.register(Building)
+class BuildingAdmin(BasicDataAdminMixin, admin.ModelAdmin):
+    pass
 
 
 @admin.register(RepairCategory)
-class RepairCategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'is_active')
-    list_filter = ('is_active',)
-    search_fields = ('name',)
+class RepairCategoryAdmin(BasicDataAdminMixin, admin.ModelAdmin):
+    list_display = (
+        'name',
+        'description',
+        'is_active',
+        'related_work_order_count',
+        'created_at',
+    )
 
 
 class WorkOrderImageInline(admin.TabularInline):

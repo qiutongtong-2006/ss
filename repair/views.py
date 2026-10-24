@@ -1,7 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, F, IntegerField, Q, Value, When
@@ -21,13 +20,21 @@ from .forms import (
     WorkOrderSubmitForm,
 )
 from .models import (
-    Building,
     Evaluation,
     RepairRecord,
     StatusLog,
     User,
     WorkOrder,
     WorkOrderImage,
+)
+from .permissions import (
+    is_assigned_repairer,
+    is_manager_user,
+    is_student_owner,
+    require_assigned_repairer,
+    require_student_owner,
+    require_work_order_access,
+    role_required,
 )
 
 
@@ -90,12 +97,9 @@ def home(request):
     )
 
 
-@login_required
+@role_required(User.Role.STUDENT)
 def my_orders(request):
     """学生查看自己的报修列表。"""
-    if request.user.role != User.Role.STUDENT:
-        raise PermissionDenied('只有学生可以查看“我的报修”。')
-
     queryset = WorkOrder.objects.filter(student=request.user).select_related(
         'building',
         'category',
@@ -122,12 +126,9 @@ def my_orders(request):
     )
 
 
-@login_required
+@role_required(User.Role.REPAIRER)
 def repairer_orders(request):
     """维修人员查看派给自己的任务。"""
-    if request.user.role != User.Role.REPAIRER:
-        raise PermissionDenied('只有维修人员可以查看“我的维修任务”。')
-
     params = request.GET.copy()
     if 'status' not in params:
         params['status'] = 'active'
@@ -187,15 +188,9 @@ def repairer_orders(request):
     )
 
 
-@login_required
+@role_required(User.Role.MANAGER, allow_superuser=True)
 def manager_orders(request):
     """宿管工单池，默认显示待受理工单。"""
-    if not (
-        request.user.role == User.Role.MANAGER
-        or request.user.is_superuser
-    ):
-        raise PermissionDenied('只有宿管可以查看工单池。')
-
     params = request.GET.copy()
     if 'status' not in params:
         params['status'] = WorkOrder.Status.PENDING
@@ -232,24 +227,15 @@ def manager_orders(request):
     )
 
 
-@login_required
+@role_required(User.Role.STUDENT)
 def submit_repair(request):
     """学生提交报修，并保存现场照片。"""
-    if request.user.role != User.Role.STUDENT:
-        messages.error(request, '只有学生可以提交报修。')
-        return redirect('repair:home')
-
     if request.method == 'POST':
         form = WorkOrderSubmitForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
-            building_name = form.cleaned_data['building_name']
-            building = Building.objects.filter(name__iexact=building_name).first()
-            if building is None:
-                building = Building.objects.create(name=building_name)
-
             work_order = form.save(commit=False)
             work_order.student = request.user
-            work_order.building = building
+            work_order.building = form.cleaned_data['building']
             with transaction.atomic():
                 work_order.save()
                 for image in form.cleaned_data['images']:
@@ -271,7 +257,6 @@ def submit_repair(request):
         'repair/submit_repair.html',
         {
             'form': form,
-            'building_options': Building.objects.filter(is_active=True),
         },
     )
 
@@ -293,29 +278,11 @@ def work_order_detail(request, pk):
         pk=pk,
     )
 
-    if (
-        request.user.role == User.Role.STUDENT
-        and work_order.student_id != request.user.id
-    ):
-        raise PermissionDenied('不能查看其他学生的报修。')
-    if (
-        request.user.role == User.Role.REPAIRER
-        and work_order.repairer_id != request.user.id
-    ):
-        raise PermissionDenied('不能查看未派给自己的工单。')
+    require_work_order_access(request.user, work_order)
 
-    is_student_owner = (
-        request.user.role == User.Role.STUDENT
-        and work_order.student_id == request.user.id
-    )
-    is_manager = (
-        request.user.role == User.Role.MANAGER
-        or request.user.is_superuser
-    )
-    is_repairer_assigned = (
-        request.user.role == User.Role.REPAIRER
-        and work_order.repairer_id == request.user.id
-    )
+    student_owner = is_student_owner(request.user, work_order)
+    manager = is_manager_user(request.user)
+    repairer_assigned = is_assigned_repairer(request.user, work_order)
     status_logs = work_order.status_logs.select_related('operator')
     repair_records = work_order.repair_records.all()
     evaluation = getattr(work_order, 'evaluation', None)
@@ -329,39 +296,35 @@ def work_order_detail(request, pk):
             'repair_records': repair_records,
             'evaluation': evaluation,
             'can_cancel': (
-                is_student_owner
+                student_owner
                 and work_order.status == WorkOrder.Status.PENDING
             ),
             'can_manage': (
-                is_manager
+                manager
                 and work_order.status == WorkOrder.Status.PENDING
             ),
             'can_start_repair': (
-                is_repairer_assigned
+                repairer_assigned
                 and work_order.status == WorkOrder.Status.ASSIGNED
             ),
             'can_complete_repair': (
-                is_repairer_assigned
+                repairer_assigned
                 and work_order.status == WorkOrder.Status.REPAIRING
             ),
             'can_accept_result': (
-                is_student_owner
+                student_owner
                 and work_order.status == WorkOrder.Status.PENDING_ACCEPTANCE
             ),
         },
     )
 
 
-@login_required
+@role_required(User.Role.REPAIRER)
 @require_POST
 def start_repair(request, pk):
     """维修人员接单，将工单从已派单转为维修中。"""
-    if request.user.role != User.Role.REPAIRER:
-        raise PermissionDenied('只有维修人员可以接单。')
-
     work_order = get_object_or_404(WorkOrder, pk=pk)
-    if work_order.repairer_id != request.user.id:
-        raise PermissionDenied('不能接未派给自己的工单。')
+    require_assigned_repairer(request.user, work_order, '不能接未派给自己的工单。')
     if work_order.status != WorkOrder.Status.ASSIGNED:
         messages.error(request, '只有已派单工单可以接单。')
         return redirect('repair:work_order_detail', pk=work_order.pk)
@@ -387,15 +350,15 @@ def start_repair(request, pk):
     return redirect('repair:work_order_detail', pk=work_order.pk)
 
 
-@login_required
+@role_required(User.Role.REPAIRER)
 def complete_repair(request, pk):
     """维修人员填写维修记录并提交完工。"""
-    if request.user.role != User.Role.REPAIRER:
-        raise PermissionDenied('只有维修人员可以提交完工。')
-
     work_order = get_object_or_404(WorkOrder, pk=pk)
-    if work_order.repairer_id != request.user.id:
-        raise PermissionDenied('不能提交未派给自己的工单。')
+    require_assigned_repairer(
+        request.user,
+        work_order,
+        '不能提交未派给自己的工单。',
+    )
     if work_order.status != WorkOrder.Status.REPAIRING:
         messages.error(request, '只有维修中的工单可以填写维修记录并提交完工。')
         return redirect('repair:work_order_detail', pk=work_order.pk)
@@ -459,7 +422,7 @@ def complete_repair(request, pk):
     )
 
 
-@login_required
+@role_required(User.Role.STUDENT)
 def acceptance_result(request, pk):
     """学生验收通过，并对已完工工单提交一次性评价。"""
     work_order = get_object_or_404(
@@ -471,11 +434,7 @@ def acceptance_result(request, pk):
         ).prefetch_related('repair_records__repairer'),
         pk=pk,
     )
-    if (
-        request.user.role != User.Role.STUDENT
-        or work_order.student_id != request.user.id
-    ):
-        raise PermissionDenied('只能验收自己的报修。')
+    require_student_owner(request.user, work_order, '只能验收自己的报修。')
     if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
         messages.error(request, '只有待验收工单可以确认修复。')
         return redirect('repair:work_order_detail', pk=work_order.pk)
@@ -538,7 +497,7 @@ def acceptance_result(request, pk):
     )
 
 
-@login_required
+@role_required(User.Role.STUDENT)
 def return_repair(request, pk):
     """学生退回未修复的工单，由原维修人员继续处理。"""
     work_order = get_object_or_404(
@@ -550,11 +509,7 @@ def return_repair(request, pk):
         ).prefetch_related('repair_records__repairer'),
         pk=pk,
     )
-    if (
-        request.user.role != User.Role.STUDENT
-        or work_order.student_id != request.user.id
-    ):
-        raise PermissionDenied('只能退回自己的报修。')
+    require_student_owner(request.user, work_order, '只能退回自己的报修。')
     if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
         messages.error(request, '只有待验收工单可以退回返修。')
         return redirect('repair:work_order_detail', pk=work_order.pk)
@@ -606,15 +561,9 @@ def return_repair(request, pk):
     )
 
 
-@login_required
+@role_required(User.Role.MANAGER, allow_superuser=True)
 def accept_order(request, pk):
     """宿管受理待受理工单并派给维修人员。"""
-    if not (
-        request.user.role == User.Role.MANAGER
-        or request.user.is_superuser
-    ):
-        raise PermissionDenied('只有宿管可以受理并派单。')
-
     work_order = get_object_or_404(WorkOrder, pk=pk)
     if work_order.status != WorkOrder.Status.PENDING:
         messages.error(request, '只有待受理工单可以受理并派单。')
@@ -701,15 +650,9 @@ def accept_order(request, pk):
     )
 
 
-@login_required
+@role_required(User.Role.MANAGER, allow_superuser=True)
 def reject_order(request, pk):
     """宿管驳回待受理工单。"""
-    if not (
-        request.user.role == User.Role.MANAGER
-        or request.user.is_superuser
-    ):
-        raise PermissionDenied('只有宿管可以驳回工单。')
-
     work_order = get_object_or_404(WorkOrder, pk=pk)
     if work_order.status != WorkOrder.Status.PENDING:
         messages.error(request, '只有待受理工单可以驳回。')
@@ -742,15 +685,11 @@ def reject_order(request, pk):
     )
 
 
-@login_required
+@role_required(User.Role.STUDENT)
 def cancel_order(request, pk):
     """学生撤销自己的待受理工单。"""
     work_order = get_object_or_404(WorkOrder, pk=pk)
-    if (
-        request.user.role != User.Role.STUDENT
-        or work_order.student_id != request.user.id
-    ):
-        raise PermissionDenied('只能撤销自己的报修。')
+    require_student_owner(request.user, work_order, '只能撤销自己的报修。')
     if work_order.status != WorkOrder.Status.PENDING:
         messages.error(request, '只有待受理工单可以撤销。')
         return redirect('repair:work_order_detail', pk=work_order.pk)
