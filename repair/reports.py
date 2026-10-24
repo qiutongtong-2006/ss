@@ -13,6 +13,16 @@ REPORT_RANGE_CHOICES = (
     ('all', '全部'),
 )
 VALID_REPORT_RANGES = {value for value, _ in REPORT_RANGE_CHOICES}
+PIE_COLORS = (
+    '#2563eb',
+    '#0ea5e9',
+    '#14b8a6',
+    '#f59e0b',
+    '#8b5cf6',
+    '#ef4444',
+    '#ec4899',
+    '#84cc16',
+)
 
 
 def _range_bounds(range_key):
@@ -76,8 +86,18 @@ def build_report(range_key='7d'):
         .annotate(total=Count('id'))
         .order_by('-total', 'category__name')
     )
-    for row in category_counts:
+    category_counts = list(category_counts)
+    start_percentage = 0.0
+    for index, row in enumerate(category_counts):
         category_total = row['total']
+        if index == len(category_counts) - 1:
+            end_percentage = 100.0
+        else:
+            end_percentage = (
+                start_percentage + category_total * 100 / total
+                if total
+                else 100.0
+            )
         category_rows.append(
             {
                 'id': row['category_id'],
@@ -86,8 +106,12 @@ def build_report(range_key='7d'):
                 'percentage': (
                     round(category_total * 100 / total, 1) if total else 0.0
                 ),
+                'color': PIE_COLORS[index % len(PIE_COLORS)],
+                'start_percentage': round(start_percentage, 4),
+                'end_percentage': round(end_percentage, 4),
             }
         )
+        start_percentage = end_percentage
 
     return {
         'range_key': range_key,

@@ -316,9 +316,58 @@ body {
     line-height: 1.45;
 }
 
-.report-chart {
-    width: 100%;
+.report-pie-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.2rem;
     min-height: 340px;
+    padding: 0.5rem 0 0;
+}
+
+.report-pie {
+    width: min(250px, 72vw);
+    aspect-ratio: 1;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    border: 7px solid #fff;
+    box-shadow:
+        0 0 0 1px #dbeafe,
+        0 16px 30px rgba(30, 64, 175, 0.14);
+}
+
+.report-pie-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 1rem;
+    width: 100%;
+}
+
+.report-pie-legend-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+    color: #475569;
+    font-size: 0.82rem;
+}
+
+.report-color-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+}
+
+.report-pie-legend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.report-pie-legend-item strong {
+    color: #334155;
 }
 
 .report-table th {

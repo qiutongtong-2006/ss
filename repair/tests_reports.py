@@ -150,9 +150,18 @@ class ReportDashboardTests(TestCase):
         self.assertContains(response, '报修总量')
         self.assertContains(response, '完成率')
         self.assertContains(response, '历史停用分类')
-        self.assertContains(response, 'report-category-data')
         self.assertContains(response, '报修分类占比饼图')
-        self.assertContains(response, "radius: '68%'")
+        self.assertContains(response, 'conic-gradient(')
+        self.assertContains(response, 'report-pie-legend')
+        self.assertNotContains(response, 'echarts.min.js')
+        self.assertEqual(
+            response.context['category_rows'][0]['start_percentage'],
+            0.0,
+        )
+        self.assertEqual(
+            response.context['category_rows'][-1]['end_percentage'],
+            100.0,
+        )
 
     def test_all_range_includes_historical_orders(self):
         self.create_report_orders()
@@ -183,7 +192,7 @@ class ReportDashboardTests(TestCase):
         self.assertEqual(response.context['category_rows'], [])
         self.assertContains(response, '当前范围暂无报修数据')
         self.assertContains(response, '暂无分类数据')
-        self.assertNotContains(response, 'echarts.min.js')
+        self.assertNotContains(response, 'report-pie')
 
     def test_manager_home_and_navigation_link_to_report(self):
         self.client.force_login(self.manager)

@@ -69,8 +69,21 @@
         <div class="card section-card h-100">
             <h2 class="section-title">分类占比</h2>
             {% if category_rows %}
-                <div id="category-chart" class="report-chart" role="img"
-                     aria-label="报修分类占比饼图"></div>
+                <div class="report-pie-layout">
+                    <div id="category-chart" class="report-pie" role="img"
+                         aria-label="报修分类占比饼图"
+                         style="background: conic-gradient({% for row in category_rows %}{{ row.color }} {{ row.start_percentage }}% {{ row.end_percentage }}%{% if not forloop.last %}, {% endif %}{% endfor %});"></div>
+                    <div class="report-pie-legend">
+                        {% for row in category_rows %}
+                            <div class="report-pie-legend-item">
+                                <span class="report-color-dot"
+                                      style="background: {{ row.color }};"></span>
+                                <span class="report-pie-legend-name">{{ row.name }}</span>
+                                <strong>{{ row.percentage|floatformat:1 }}%</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
             {% else %}
                 <div class="report-empty">
                     <strong>当前范围暂无报修数据</strong>
@@ -130,56 +143,4 @@
     <span>报修总量按工单提交时间筛选；已驳回和已撤销工单计入总量，但不算处理中或已完成。</span>
 </div>
 
-{{ category_rows|json_script:"report-category-data" }}
-{% endblock %}
-
-{% block extra_scripts %}
-    {% if category_rows %}
-        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                const chartElement = document.getElementById('category-chart');
-                const dataElement = document.getElementById('report-category-data');
-                if (!chartElement || !dataElement || typeof echarts === 'undefined') {
-                    return;
-                }
-
-                const categoryRows = JSON.parse(dataElement.textContent);
-                const chart = echarts.init(chartElement);
-                chart.setOption({
-                    color: ['#2563eb', '#0ea5e9', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'],
-                    tooltip: {
-                        trigger: 'item',
-                        formatter: '{b}<br/>{c} 单 · {d}%'
-                    },
-                    legend: {
-                        bottom: 0,
-                        type: 'scroll',
-                        textStyle: { color: '#475569' }
-                    },
-                    series: [{
-                        type: 'pie',
-                        radius: '68%',
-                        center: ['50%', '44%'],
-                        avoidLabelOverlap: true,
-                        itemStyle: {
-                            borderColor: '#ffffff',
-                            borderWidth: 3,
-                            borderRadius: 5
-                        },
-                        label: {
-                            formatter: '{b}\n{d}%',
-                            color: '#334155',
-                            fontSize: 12
-                        },
-                        data: categoryRows.map((row) => ({
-                            name: row.name,
-                            value: row.total
-                        }))
-                    }]
-                });
-                window.addEventListener('resize', () => chart.resize());
-            });
-        </script>
-    {% endif %}
 {% endblock %}
