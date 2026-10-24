@@ -151,6 +151,8 @@ class ReportDashboardTests(TestCase):
         self.assertContains(response, '完成率')
         self.assertContains(response, '历史停用分类')
         self.assertContains(response, 'report-category-data')
+        self.assertContains(response, '报修分类占比饼图')
+        self.assertContains(response, "radius: '68%'")
 
     def test_all_range_includes_historical_orders(self):
         self.create_report_orders()

@@ -70,7 +70,7 @@
             <h2 class="section-title">分类占比</h2>
             {% if category_rows %}
                 <div id="category-chart" class="report-chart" role="img"
-                     aria-label="报修分类占比环形图"></div>
+                     aria-label="报修分类占比饼图"></div>
             {% else %}
                 <div class="report-empty">
                     <strong>当前范围暂无报修数据</strong>
@@ -159,7 +159,7 @@
                     },
                     series: [{
                         type: 'pie',
-                        radius: ['43%', '68%'],
+                        radius: '68%',
                         center: ['50%', '44%'],
                         avoidLabelOverlap: true,
                         itemStyle: {
