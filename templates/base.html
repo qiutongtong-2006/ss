@@ -43,13 +43,17 @@
                            href="{% url 'repair:repairer_orders' %}">我的维修任务</a>
                     </li>
                 {% endif %}
+                {% if user.is_authenticated and user.role == 'manager' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'manager_orders' %}active{% endif %}"
+                           href="{% url 'repair:manager_orders' %}">工单池</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'report_dashboard' %}active{% endif %}"
+                           href="{% url 'repair:report_dashboard' %}">统计报表</a>
+                    </li>
+                {% endif %}
                 {% if user.is_authenticated and user.is_staff %}
-                    {% if user.role == 'manager' %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.resolver_match.url_name == 'manager_orders' %}active{% endif %}"
-                               href="{% url 'repair:manager_orders' %}">工单池</a>
-                        </li>
-                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'admin:index' %}">管理后台</a>
                     </li>
@@ -97,6 +101,7 @@
     </div>
 </footer>
 
+{% block extra_scripts %}{% endblock %}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

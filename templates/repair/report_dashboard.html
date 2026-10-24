@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}统计报表 · 学生宿舍报修系统{% endblock %}
+
+{% block content %}
+<div class="page-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3">
+    <div>
+        <span class="eyebrow">REPAIR ANALYTICS</span>
+        <h1 class="page-title mt-1 mb-2">统计报表</h1>
+        <p class="page-subtitle mb-0">查看报修量、处理进度、完成率和分类占比。</p>
+    </div>
+    <span class="muted-chip">数据更新于 {{ generated_at|date:"Y-m-d H:i" }}</span>
+</div>
+
+<div class="card report-toolbar mb-4">
+    <form method="get" class="d-flex flex-column flex-sm-row align-items-sm-end gap-3">
+        <div class="flex-grow-1">
+            <label class="form-label" for="report-range">统计时间</label>
+            <select class="form-select" id="report-range" name="range">
+                {% for value, label in range_choices %}
+                    <option value="{{ value }}" {% if range_key == value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary px-4" type="submit">查看统计</button>
+    </form>
+    <p class="text-muted small mb-0 mt-3">当前范围：{{ range_label }}</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="report-kpi primary">
+            <span class="report-kpi-icon">量</span>
+            <span class="report-kpi-label">报修总量</span>
+            <strong class="report-kpi-value">{{ total }}</strong>
+            <small>所选时间范围内的全部工单</small>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="report-kpi success">
+            <span class="report-kpi-icon">成</span>
+            <span class="report-kpi-label">已完成</span>
+            <strong class="report-kpi-value">{{ completed }}</strong>
+            <small>已完成验收并归档的工单</small>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="report-kpi warning">
+            <span class="report-kpi-icon">办</span>
+            <span class="report-kpi-label">处理中</span>
+            <strong class="report-kpi-value">{{ processing }}</strong>
+            <small>待受理、已派单、维修中、待验收</small>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="report-kpi accent">
+            <span class="report-kpi-icon">率</span>
+            <span class="report-kpi-label">完成率</span>
+            <strong class="report-kpi-value">{{ completion_rate|floatformat:1 }}<span>%</span></strong>
+            <small>已完成数量 ÷ 报修总量</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card section-card h-100">
+            <h2 class="section-title">分类占比</h2>
+            {% if category_rows %}
+                <div id="category-chart" class="report-chart" role="img"
+                     aria-label="报修分类占比环形图"></div>
+            {% else %}
+                <div class="report-empty">
+                    <strong>当前范围暂无报修数据</strong>
+                    <span>切换时间范围后可以查看统计结果。</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card section-card h-100">
+            <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                <h2 class="section-title mb-0">分类明细</h2>
+                <span class="text-muted small">共 {{ category_rows|length }} 个分类</span>
+            </div>
+            {% if category_rows %}
+                <div class="table-responsive">
+                    <table class="table report-table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">报修分类</th>
+                                <th scope="col" class="text-end">工单数</th>
+                                <th scope="col" class="report-share-column">占比</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in category_rows %}
+                                <tr>
+                                    <td class="fw-semibold">{{ row.name }}</td>
+                                    <td class="text-end">{{ row.total }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="report-share-track" aria-hidden="true">
+                                                <span style="width: {{ row.percentage }}%"></span>
+                                            </div>
+                                            <span class="report-share-value">
+                                                {{ row.percentage|floatformat:1 }}%
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="report-empty compact">
+                    <strong>暂无分类数据</strong>
+                    <span>有工单后将自动生成分类统计。</span>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="report-definition mt-4">
+    <strong>统计口径</strong>
+    <span>报修总量按工单提交时间筛选；已驳回和已撤销工单计入总量，但不算处理中或已完成。</span>
+</div>
+
+{{ category_rows|json_script:"report-category-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+    {% if category_rows %}
+        <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const chartElement = document.getElementById('category-chart');
+                const dataElement = document.getElementById('report-category-data');
+                if (!chartElement || !dataElement || typeof echarts === 'undefined') {
+                    return;
+                }
+
+                const categoryRows = JSON.parse(dataElement.textContent);
+                const chart = echarts.init(chartElement);
+                chart.setOption({
+                    color: ['#2563eb', '#0ea5e9', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444'],
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: '{b}<br/>{c} 单 · {d}%'
+                    },
+                    legend: {
+                        bottom: 0,
+                        type: 'scroll',
+                        textStyle: { color: '#475569' }
+                    },
+                    series: [{
+                        type: 'pie',
+                        radius: ['43%', '68%'],
+                        center: ['50%', '44%'],
+                        avoidLabelOverlap: true,
+                        itemStyle: {
+                            borderColor: '#ffffff',
+                            borderWidth: 3,
+                            borderRadius: 5
+                        },
+                        label: {
+                            formatter: '{b}\n{d}%',
+                            color: '#334155',
+                            fontSize: 12
+                        },
+                        data: categoryRows.map((row) => ({
+                            name: row.name,
+                            value: row.total
+                        }))
+                    }]
+                });
+                window.addEventListener('resize', () => chart.resize());
+            });
+        </script>
+    {% endif %}
+{% endblock %}

@@ -47,6 +47,7 @@
 - [迭代 5 完成记录](迭代5-完成记录.md)
 - [迭代 6 计划](迭代6-计划.md)
 - [迭代 6 缺陷修复记录](迭代6-缺陷修复记录.md)
+- [迭代 6 统计报表完成记录](迭代6-统计报表完成记录.md)
 - [UI 优化待办](UI优化待办.md)
 
 图表文件：
@@ -99,6 +100,9 @@ $env:DJANGO_SETTINGS_MODULE='ss.test_settings'
 
 # 迭代 6 MySQL 工单号与待受理状态并发验证（自动清理临时数据）
 .\.venv\Scripts\python.exe scripts\iteration6_mysql_consistency.py
+
+# 迭代 6 MySQL 统计报表验证（自动回滚临时数据）
+.\.venv\Scripts\python.exe scripts\iteration6_reports_mysql.py
 
 # 创建管理员
 .\.venv\Scripts\python.exe manage.py createsuperuser

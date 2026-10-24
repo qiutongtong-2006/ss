@@ -37,6 +37,7 @@ from .permissions import (
     require_work_order_access,
     role_required,
 )
+from .reports import build_report
 
 
 def paginate_work_orders(queryset, params):
@@ -230,6 +231,16 @@ def manager_orders(request):
             'filter_form': filter_form,
             'summary': summary,
         },
+    )
+
+
+@role_required(User.Role.MANAGER, allow_superuser=True)
+def report_dashboard(request):
+    """宿管统计报表：报修量、处理量、完成率和分类占比。"""
+    return render(
+        request,
+        'repair/report_dashboard.html',
+        build_report(request.GET.get('range', '7d')),
     )
 
 

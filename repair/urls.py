@@ -12,6 +12,7 @@ urlpatterns = [
     path('my-orders/', views.my_orders, name='my_orders'),
     path('my-tasks/', views.repairer_orders, name='repairer_orders'),
     path('manage/orders/', views.manager_orders, name='manager_orders'),
+    path('manage/reports/', views.report_dashboard, name='report_dashboard'),
     path('repair/new/', views.submit_repair, name='submit_repair'),
     path('repair/<int:pk>/accept/', views.accept_order, name='accept_order'),
     path('repair/<int:pk>/start/', views.start_repair, name='start_repair'),
