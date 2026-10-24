@@ -153,6 +153,7 @@ class ReportDashboardTests(TestCase):
         self.assertContains(response, '报修分类占比饼图')
         self.assertContains(response, 'conic-gradient(')
         self.assertContains(response, 'report-pie-legend')
+        self.assertContains(response, 'css/app.css?v=20261024-report-pie')
         self.assertNotContains(response, 'echarts.min.js')
         self.assertEqual(
             response.context['category_rows'][0]['start_percentage'],
@@ -192,7 +193,7 @@ class ReportDashboardTests(TestCase):
         self.assertEqual(response.context['category_rows'], [])
         self.assertContains(response, '当前范围暂无报修数据')
         self.assertContains(response, '暂无分类数据')
-        self.assertNotContains(response, 'report-pie')
+        self.assertNotContains(response, 'id="category-chart"')
 
     def test_manager_home_and_navigation_link_to_report(self):
         self.client.force_login(self.manager)
