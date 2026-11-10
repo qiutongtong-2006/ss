@@ -562,6 +562,9 @@ class BasicDataAdminTests(TestCase):
     def test_non_staff_manager_cannot_enter_django_admin(self):
         self.client.force_login(self.manager)
 
+        home_response = self.client.get(reverse('repair:home'))
+        self.assertNotContains(home_response, reverse('admin:index'))
+
         response = self.client.get(reverse('admin:index'))
 
         self.assertEqual(response.status_code, 302)

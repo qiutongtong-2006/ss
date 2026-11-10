@@ -4,6 +4,31 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from .models import Building, RepairCategory, User, WorkOrder
 
 
+def form_textarea(
+    label,
+    *,
+    placeholder,
+    max_length,
+    required=True,
+    rows=3,
+    help_text='',
+):
+    """构造项目统一使用的文本域字段。"""
+    return forms.CharField(
+        label=label,
+        max_length=max_length,
+        required=required,
+        widget=forms.Textarea(
+            attrs={
+                'class': 'form-control',
+                'rows': rows,
+                'placeholder': placeholder,
+            }
+        ),
+        help_text=help_text,
+    )
+
+
 class SystemAuthenticationForm(AuthenticationForm):
     """阻止角色配置异常的历史账号登录前台。"""
 
@@ -94,16 +119,11 @@ class WorkOrderSubmitForm(forms.ModelForm):
             }
         ),
     )
-    remark = forms.CharField(
-        label='备注（选填）',
+    remark = form_textarea(
+        '备注（选填）',
         required=False,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：只有晚上 7 点后有人；进门请先敲门；故障位置在阳台',
-            }
-        ),
+        max_length=500,
+        placeholder='例如：只有晚上 7 点后有人；进门请先敲门；故障位置在阳台',
         help_text='其他需要告知维修人员的信息。',
     )
     allow_entry_without_student = forms.BooleanField(
@@ -182,31 +202,20 @@ class WorkOrderSubmitForm(forms.ModelForm):
 
 
 class RejectOrderForm(forms.Form):
-    reason = forms.CharField(
-        label='驳回原因',
+    reason = form_textarea(
+        '驳回原因',
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': '请说明驳回原因，学生会在工单详情中看到',
-            }
-        ),
+        rows=4,
+        placeholder='请说明驳回原因，学生会在工单详情中看到',
     )
 
 
 class CancelOrderForm(forms.Form):
-    reason = forms.CharField(
-        label='撤销原因（选填）',
+    reason = form_textarea(
+        '撤销原因（选填）',
         required=False,
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '如果愿意，可以说明撤销原因',
-            }
-        ),
+        placeholder='如果愿意，可以说明撤销原因',
     )
 
 
@@ -216,17 +225,11 @@ class AcceptOrderForm(forms.Form):
         queryset=User.objects.none(),
         empty_label='请选择维修人员',
     )
-    contact_note = forms.CharField(
-        label='联系备注（选填）',
+    contact_note = form_textarea(
+        '联系备注（选填）',
         required=False,
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：已电话联系，约定周六上午上门',
-            }
-        ),
+        placeholder='例如：已电话联系，约定周六上午上门',
         help_text='学生未授权入室时，建议记录联系结果。',
     )
     appointment_at = forms.DateTimeField(
@@ -249,41 +252,25 @@ class AcceptOrderForm(forms.Form):
 
 
 class RepairCompletionForm(forms.Form):
-    fault_cause = forms.CharField(
-        label='故障原因（选填）',
+    fault_cause = form_textarea(
+        '故障原因（选填）',
         required=False,
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': '例如：水龙头阀芯老化导致持续漏水',
-            }
-        ),
+        placeholder='例如：水龙头阀芯老化导致持续漏水',
     )
-    repair_action = forms.CharField(
-        label='维修内容（必填）',
+    repair_action = form_textarea(
+        '维修内容（必填）',
         max_length=2000,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': '请填写实际处理措施和维修结果',
-            }
-        ),
+        rows=4,
+        placeholder='请填写实际处理措施和维修结果',
         help_text='说明如何完成维修，作为本工单的维修记录。',
     )
-    materials_used = forms.CharField(
-        label='更换材料（选填）',
+    materials_used = form_textarea(
+        '更换材料（选填）',
         required=False,
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 2,
-                'placeholder': '例如：阀芯 1 个、密封圈 2 个；未更换材料可留空',
-            }
-        ),
+        rows=2,
+        placeholder='例如：阀芯 1 个、密封圈 2 个；未更换材料可留空',
     )
 
 
@@ -300,29 +287,19 @@ class AcceptanceEvaluationForm(forms.Form):
         coerce=int,
         widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
     )
-    comment = forms.CharField(
-        label='评价内容',
+    comment = form_textarea(
+        '评价内容',
         max_length=1000,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': '请描述维修效果、响应速度或需要改进的地方',
-            }
-        ),
+        rows=4,
+        placeholder='请描述维修效果、响应速度或需要改进的地方',
         help_text='评价提交后不能修改。',
     )
 
 
 class AcceptanceReturnForm(forms.Form):
-    reason = forms.CharField(
-        label='退回原因',
+    reason = form_textarea(
+        '退回原因',
         max_length=500,
-        widget=forms.Textarea(
-            attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'placeholder': '请说明故障仍然存在或尚未解决的问题',
-            }
-        ),
+        rows=4,
+        placeholder='请说明故障仍然存在或尚未解决的问题',
     )

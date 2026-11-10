@@ -1,5 +1,8 @@
+from datetime import timedelta
 import re
 import unicodedata
+
+from django.utils import timezone
 
 
 CHINESE_DIGITS = {
@@ -15,6 +18,14 @@ CHINESE_DIGITS = {
     '八': '8',
     '九': '9',
 }
+
+UNACCEPTED_OVERDUE_HOURS = 24
+
+
+def unaccepted_overdue_cutoff(now=None):
+    """返回“仍未受理”工单的超时截止时间。"""
+    current_time = now or timezone.now()
+    return current_time - timedelta(hours=UNACCEPTED_OVERDUE_HOURS)
 
 
 def chinese_number_to_arabic(text):

@@ -1,28 +1,21 @@
 {% extends 'base.html' %}
 
 {% block title %}学生注册 · 学生宿舍报修系统{% endblock %}
+{% block body_class %}auth-page{% endblock %}
 
 {% block content %}
-<div class="auth-layout">
-    <section class="auth-intro">
-        <span class="eyebrow">STUDENT SIGN UP</span>
-        <h1 class="mt-2 mb-3">先注册，<br>再提交第一条报修</h1>
-        <p>使用学号注册学生账号。维修人员和宿管账号由管理员统一创建，不开放自助注册。</p>
-        <ul class="auth-points">
-            <li>用户名就是学号，登录方便</li>
-            <li>注册后自动登录，直接进入学生首页</li>
-            <li>联系电话用于宿管约定上门时间</li>
-        </ul>
-    </section>
-
-    <section class="card auth-card">
-        <h2 class="h4 mb-1">学生注册</h2>
-        <p class="text-muted small mb-4">带星号的项目为必填项。</p>
+<div class="auth-layout auth-layout-register">
+    <section class="card auth-card auth-card-register">
+        <div class="auth-heading">
+            <span class="auth-icon" aria-hidden="true">宿</span>
+            <h1 class="auth-title">学生注册</h1>
+            <p class="auth-subtitle">使用学号创建学生账号，注册成功后会自动登录。维修人员和宿管账号由管理员统一创建。</p>
+        </div>
 
         <form method="post" novalidate>
             {% csrf_token %}
             {% if form.non_field_errors %}
-                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
             {% endif %}
 
             {% for field in form %}
@@ -40,10 +33,10 @@
                 </div>
             {% endfor %}
 
-            <button class="btn btn-primary w-100" type="submit">注册并登录</button>
+            <button class="btn btn-primary auth-submit w-100" type="submit">注册并登录</button>
         </form>
 
-        <p class="text-center text-muted small mt-4 mb-0">
+        <p class="auth-switch">
             已有账号？<a href="{% url 'repair:login' %}">直接登录</a>
         </p>
     </section>

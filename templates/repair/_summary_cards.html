@@ -1,0 +1,8 @@
+<div class="summary-strip card section-card">
+    {% for label, value, tone in summary_cards %}
+        <div class="summary-metric">
+            <span class="summary-metric-label">{{ label }}</span>
+            <strong class="summary-metric-value text-{{ tone }}">{{ value }}</strong>
+        </div>
+    {% endfor %}
+</div>

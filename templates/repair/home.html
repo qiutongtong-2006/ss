@@ -82,29 +82,6 @@
         </div>
     </div>
 
-    <div class="card section-card mt-4">
-        <h2 class="section-title">报修流程</h2>
-        <div class="row g-3">
-            <div class="col-md-4">
-                <div class="p-3 rounded-3 bg-light h-100">
-                    <strong>1. 提交报修</strong>
-                    <p class="text-muted small mb-0 mt-1">填写楼栋、宿舍号和故障描述，上传现场照片。</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="p-3 rounded-3 bg-light h-100">
-                    <strong>2. 受理派单</strong>
-                    <p class="text-muted small mb-0 mt-1">宿管查看工单池，受理后派给维修人员。</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="p-3 rounded-3 bg-light h-100">
-                    <strong>3. 维修验收</strong>
-                    <p class="text-muted small mb-0 mt-1">维修完成后，学生确认结果并进行评价。</p>
-                </div>
-            </div>
-        </div>
-    </div>
 {% elif user.role == 'manager' %}
     <div class="row g-4">
         <div class="col-md-6">
@@ -127,11 +104,13 @@
             </a>
         </div>
     </div>
-    <div class="card section-card mt-4">
-        <h2 class="section-title">基础数据维护</h2>
-        <p class="text-muted small">楼栋、报修类别和用户账号目前通过 Django Admin 维护。</p>
-        <a class="btn btn-outline-primary" href="{% url 'admin:index' %}">进入管理后台</a>
-    </div>
+    {% if user.is_staff %}
+        <div class="card section-card mt-4">
+            <h2 class="section-title">基础数据维护</h2>
+            <p class="text-muted small">楼栋、报修类别和用户账号目前通过 Django Admin 维护。</p>
+            <a class="btn btn-outline-primary" href="{% url 'admin:index' %}">进入管理后台</a>
+        </div>
+    {% endif %}
 {% else %}
     <div class="row g-4">
         <div class="col-md-6">

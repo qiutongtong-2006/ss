@@ -1,3 +1,5 @@
+from functools import wraps
+
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -18,7 +20,6 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .filters import STUDENT_PROCESSING_STATUSES, filter_work_orders
-from .deadlines import unaccepted_overdue_cutoff
 from .forms import (
     AcceptanceEvaluationForm,
     AcceptanceReturnForm,
@@ -48,6 +49,7 @@ from .permissions import (
     role_required,
 )
 from .reports import build_report
+from .utils import unaccepted_overdue_cutoff
 
 
 def paginate_work_orders(queryset, params):
@@ -56,6 +58,43 @@ def paginate_work_orders(queryset, params):
     query_params = params.copy()
     query_params.pop('page', None)
     return page_obj, query_params.urlencode()
+
+
+def redirect_to_work_order(request, work_order, message, level='error'):
+    """显示操作提示并返回工单详情页。"""
+    getattr(messages, level)(request, message)
+    return redirect('repair:work_order_detail', pk=work_order.pk)
+
+
+def work_order_action(
+    expected_status,
+    status_message,
+    permission_check=None,
+    permission_message=None,
+):
+    """进入操作页面前统一检查权限和当前工单状态。"""
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped(request, pk, *args, **kwargs):
+            work_order = get_object_or_404(WorkOrder, pk=pk)
+            if permission_check:
+                permission_check(request.user, work_order, permission_message)
+            if work_order.status != expected_status:
+                return redirect_to_work_order(request, work_order, status_message)
+            return view_func(request, work_order, *args, **kwargs)
+
+        return wrapped
+
+    return decorator
+
+
+def lock_work_order(request, work_order, expected_status, message):
+    """锁定工单；状态已变化时返回可直接用于响应的跳转。"""
+    locked_order = WorkOrder.objects.select_for_update().get(pk=work_order.pk)
+    if locked_order.status != expected_status:
+        return locked_order, redirect_to_work_order(request, locked_order, message)
+    return locked_order, None
 
 
 def register(request):
@@ -201,6 +240,13 @@ def repairer_orders(request):
             'filter_query': filter_query,
             'filter_form': filter_form,
             'summary': summary,
+            'summary_cards': (
+                ('全部任务', summary['total'], 'dark'),
+                ('待接单', summary['assigned'], 'info'),
+                ('维修中', summary['repairing'], 'primary'),
+                ('待验收', summary['pending_acceptance'], 'dark'),
+                ('已完成', summary['completed'], 'success'),
+            ),
         },
     )
 
@@ -266,6 +312,13 @@ def manager_orders(request):
             'filter_query': filter_query,
             'filter_form': filter_form,
             'summary': summary,
+            'summary_cards': (
+                ('全部工单', summary['total'], 'dark'),
+                ('待受理', summary['pending'], 'warning'),
+                ('已派单', summary['assigned'], 'info'),
+                ('维修中', summary['repairing'], 'primary'),
+                ('待验收', summary['pending_acceptance'], 'dark'),
+            ),
         },
     )
 
@@ -273,10 +326,18 @@ def manager_orders(request):
 @role_required(User.Role.MANAGER, allow_superuser=True)
 def report_dashboard(request):
     """宿管统计报表：报修量、处理量、完成率和分类占比。"""
+    report = build_report(request.GET.get('range', '7d'))
+    report['summary_cards'] = (
+        ('报修总量', report['total'], 'primary'),
+        ('已完成', report['completed'], 'success'),
+        ('处理中', report['processing'], 'warning'),
+        ('完成率', f"{report['completion_rate']:.1f}%", 'info'),
+        ('超时未受理', report['overdue'], 'danger'),
+    )
     return render(
         request,
         'repair/report_dashboard.html',
-        build_report(request.GET.get('range', '7d')),
+        report,
     )
 
 
@@ -323,8 +384,9 @@ def submit_repair(request):
                     operator=request.user,
                     remark='学生提交报修',
                 )
-            messages.success(request, f'报修提交成功，工单号：{work_order.order_no}')
-            return redirect('repair:work_order_detail', pk=work_order.pk)
+            return redirect_to_work_order(
+                request, work_order, f'报修提交成功，工单号：{work_order.order_no}', 'success'
+            )
     else:
         form = WorkOrderSubmitForm(user=request.user)
 
@@ -397,19 +459,21 @@ def work_order_detail(request, pk):
 
 @role_required(User.Role.REPAIRER)
 @require_POST
-def start_repair(request, pk):
+@work_order_action(
+    WorkOrder.Status.ASSIGNED, '只有已派单工单可以接单。',
+    require_assigned_repairer, '不能接未派给自己的工单。',
+)
+def start_repair(request, work_order):
     """维修人员接单，将工单从已派单转为维修中。"""
-    work_order = get_object_or_404(WorkOrder, pk=pk)
-    require_assigned_repairer(request.user, work_order, '不能接未派给自己的工单。')
-    if work_order.status != WorkOrder.Status.ASSIGNED:
-        messages.error(request, '只有已派单工单可以接单。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     with transaction.atomic():
-        locked_order = WorkOrder.objects.select_for_update().get(pk=work_order.pk)
-        if locked_order.status != WorkOrder.Status.ASSIGNED:
-            messages.error(request, '工单状态已变化，请刷新后重试。')
-            return redirect('repair:work_order_detail', pk=locked_order.pk)
+        locked_order, error_response = lock_work_order(
+            request,
+            work_order,
+            WorkOrder.Status.ASSIGNED,
+            '工单状态已变化，请刷新后重试。',
+        )
+        if error_response:
+            return error_response
 
         locked_order.status = WorkOrder.Status.REPAIRING
         locked_order.started_at = timezone.now()
@@ -422,23 +486,18 @@ def start_repair(request, pk):
             remark='维修人员接单，开始维修',
         )
 
-    messages.success(request, '接单成功，请完成维修后填写维修记录。')
-    return redirect('repair:work_order_detail', pk=work_order.pk)
+    return redirect_to_work_order(
+        request, work_order, '接单成功，请完成维修后填写维修记录。', 'success'
+    )
 
 
 @role_required(User.Role.REPAIRER)
-def complete_repair(request, pk):
+@work_order_action(
+    WorkOrder.Status.REPAIRING, '只有维修中的工单可以填写维修记录并提交完工。',
+    require_assigned_repairer, '不能提交未派给自己的工单。',
+)
+def complete_repair(request, work_order):
     """维修人员填写维修记录并提交完工。"""
-    work_order = get_object_or_404(WorkOrder, pk=pk)
-    require_assigned_repairer(
-        request.user,
-        work_order,
-        '不能提交未派给自己的工单。',
-    )
-    if work_order.status != WorkOrder.Status.REPAIRING:
-        messages.error(request, '只有维修中的工单可以填写维修记录并提交完工。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = RepairCompletionForm(request.POST)
         if form.is_valid():
@@ -448,15 +507,12 @@ def complete_repair(request, pk):
             now = timezone.now()
 
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+            request, work_order, WorkOrder.Status.REPAIRING,
+            '工单状态已变化，请刷新后重试。',
                 )
-                if locked_order.status != WorkOrder.Status.REPAIRING:
-                    messages.error(request, '工单状态已变化，请刷新后重试。')
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
 
                 locked_order.status = WorkOrder.Status.PENDING_ACCEPTANCE
                 locked_order.completed_at = now
@@ -483,8 +539,10 @@ def complete_repair(request, pk):
                     remark='；'.join(remark_parts),
                 )
 
-            messages.success(request, '维修记录已保存，工单已提交完工并等待学生验收。')
-            return redirect('repair:work_order_detail', pk=work_order.pk)
+            return redirect_to_work_order(
+                request, work_order,
+                '维修记录已保存，工单已提交完工并等待学生验收。', 'success',
+            )
     else:
         form = RepairCompletionForm()
 
@@ -499,7 +557,11 @@ def complete_repair(request, pk):
 
 
 @role_required(User.Role.STUDENT)
-def acceptance_result(request, pk):
+@work_order_action(
+    WorkOrder.Status.PENDING_ACCEPTANCE, '只有待验收工单可以确认修复。',
+    require_student_owner, '只能验收自己的报修。',
+)
+def acceptance_result(request, work_order):
     """学生验收通过，并对已完工工单提交一次性评价。"""
     work_order = get_object_or_404(
         WorkOrder.objects.select_related(
@@ -508,13 +570,8 @@ def acceptance_result(request, pk):
             'category',
             'repairer',
         ).prefetch_related('repair_records__repairer'),
-        pk=pk,
+        pk=work_order.pk,
     )
-    require_student_owner(request.user, work_order, '只能验收自己的报修。')
-    if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
-        messages.error(request, '只有待验收工单可以确认修复。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = AcceptanceEvaluationForm(request.POST)
         if form.is_valid():
@@ -523,21 +580,14 @@ def acceptance_result(request, pk):
             now = timezone.now()
 
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+                    request, work_order, WorkOrder.Status.PENDING_ACCEPTANCE,
+                    '工单状态已变化，请刷新后重试。',
                 )
-                if locked_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
-                    messages.error(request, '工单状态已变化，请刷新后重试。')
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
                 if Evaluation.objects.filter(work_order_id=locked_order.pk).exists():
-                    messages.error(request, '该工单已经提交过评价。')
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                    return redirect_to_work_order(request, locked_order, '该工单已经提交过评价。')
 
                 locked_order.status = WorkOrder.Status.COMPLETED
                 locked_order.verified_at = now
@@ -556,8 +606,9 @@ def acceptance_result(request, pk):
                     remark=f'学生验收通过；评分 {rating} 星',
                 )
 
-            messages.success(request, '验收完成，感谢你的评价。')
-            return redirect('repair:work_order_detail', pk=work_order.pk)
+            return redirect_to_work_order(
+                request, work_order, '验收完成，感谢你的评价。', 'success'
+            )
     else:
         form = AcceptanceEvaluationForm()
 
@@ -574,7 +625,11 @@ def acceptance_result(request, pk):
 
 
 @role_required(User.Role.STUDENT)
-def return_repair(request, pk):
+@work_order_action(
+    WorkOrder.Status.PENDING_ACCEPTANCE, '只有待验收工单可以退回返修。',
+    require_student_owner, '只能退回自己的报修。',
+)
+def return_repair(request, work_order):
     """学生退回未修复的工单，由原维修人员继续处理。"""
     work_order = get_object_or_404(
         WorkOrder.objects.select_related(
@@ -583,28 +638,20 @@ def return_repair(request, pk):
             'category',
             'repairer',
         ).prefetch_related('repair_records__repairer'),
-        pk=pk,
+        pk=work_order.pk,
     )
-    require_student_owner(request.user, work_order, '只能退回自己的报修。')
-    if work_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
-        messages.error(request, '只有待验收工单可以退回返修。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = AcceptanceReturnForm(request.POST)
         if form.is_valid():
             reason = form.cleaned_data['reason'].strip()
 
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+                    request, work_order, WorkOrder.Status.PENDING_ACCEPTANCE,
+                    '工单状态已变化，请刷新后重试。',
                 )
-                if locked_order.status != WorkOrder.Status.PENDING_ACCEPTANCE:
-                    messages.error(request, '工单状态已变化，请刷新后重试。')
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
 
                 locked_order.status = WorkOrder.Status.REPAIRING
                 locked_order.return_count += 1
@@ -617,11 +664,9 @@ def return_repair(request, pk):
                     remark=f'验收未通过，退回返修：{reason}',
                 )
 
-            messages.warning(
-                request,
-                '工单已退回维修，维修人员会继续处理。',
+            return redirect_to_work_order(
+                request, work_order, '工单已退回维修，维修人员会继续处理。', 'warning'
             )
-            return redirect('repair:work_order_detail', pk=work_order.pk)
     else:
         form = AcceptanceReturnForm()
 
@@ -638,13 +683,11 @@ def return_repair(request, pk):
 
 
 @role_required(User.Role.MANAGER, allow_superuser=True)
-def accept_order(request, pk):
+@work_order_action(
+    WorkOrder.Status.PENDING, '只有待受理工单可以受理并派单。',
+)
+def accept_order(request, work_order):
     """宿管受理待受理工单并派给维修人员。"""
-    work_order = get_object_or_404(WorkOrder, pk=pk)
-    if work_order.status != WorkOrder.Status.PENDING:
-        messages.error(request, '只有待受理工单可以受理并派单。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = AcceptOrderForm(request.POST)
         if form.is_valid():
@@ -654,15 +697,12 @@ def accept_order(request, pk):
             now = timezone.now()
 
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+                    request, work_order, WorkOrder.Status.PENDING,
+                    '工单状态已变化，请刷新后重试。',
                 )
-                if locked_order.status != WorkOrder.Status.PENDING:
-                    messages.error(request, '工单状态已变化，请刷新后重试。')
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
 
                 locked_order.repairer = repairer
                 locked_order.status = WorkOrder.Status.ASSIGNED
@@ -695,13 +735,9 @@ def accept_order(request, pk):
                     remark='；'.join(remark_parts),
                 )
 
-            messages.success(
-                request,
-                f'工单已派给 {repairer.real_name or repairer.username}。',
-            )
-            return redirect(
-                'repair:work_order_detail',
-                pk=work_order.pk,
+            return redirect_to_work_order(
+                request, work_order,
+                f'工单已派给 {repairer.real_name or repairer.username}。', 'success',
             )
     else:
         form = AcceptOrderForm(
@@ -727,30 +763,22 @@ def accept_order(request, pk):
 
 
 @role_required(User.Role.MANAGER, allow_superuser=True)
-def reject_order(request, pk):
+@work_order_action(
+    WorkOrder.Status.PENDING, '只有待受理工单可以驳回。',
+)
+def reject_order(request, work_order):
     """宿管驳回待受理工单。"""
-    work_order = get_object_or_404(WorkOrder, pk=pk)
-    if work_order.status != WorkOrder.Status.PENDING:
-        messages.error(request, '只有待受理工单可以驳回。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = RejectOrderForm(request.POST)
         if form.is_valid():
             reason = form.cleaned_data['reason']
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+                    request, work_order, WorkOrder.Status.PENDING,
+                    '工单状态已变化，无法驳回。',
                 )
-                if locked_order.status != WorkOrder.Status.PENDING:
-                    messages.error(
-                        request,
-                        '工单状态已变化，无法驳回。',
-                    )
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
                 locked_order.status = WorkOrder.Status.REJECTED
                 locked_order.reject_reason = reason
                 locked_order.save()
@@ -761,8 +789,9 @@ def reject_order(request, pk):
                     operator=request.user,
                     remark=reason,
                 )
-            messages.success(request, '工单已驳回，学生可以在详情页看到原因。')
-            return redirect('repair:work_order_detail', pk=work_order.pk)
+            return redirect_to_work_order(
+                request, work_order, '工单已驳回，学生可以在详情页看到原因。', 'success'
+            )
     else:
         form = RejectOrderForm()
 
@@ -774,31 +803,23 @@ def reject_order(request, pk):
 
 
 @role_required(User.Role.STUDENT)
-def cancel_order(request, pk):
+@work_order_action(
+    WorkOrder.Status.PENDING, '只有待受理工单可以撤销。',
+    require_student_owner, '只能撤销自己的报修。',
+)
+def cancel_order(request, work_order):
     """学生撤销自己的待受理工单。"""
-    work_order = get_object_or_404(WorkOrder, pk=pk)
-    require_student_owner(request.user, work_order, '只能撤销自己的报修。')
-    if work_order.status != WorkOrder.Status.PENDING:
-        messages.error(request, '只有待受理工单可以撤销。')
-        return redirect('repair:work_order_detail', pk=work_order.pk)
-
     if request.method == 'POST':
         form = CancelOrderForm(request.POST)
         if form.is_valid():
             reason = form.cleaned_data.get('reason', '')
             with transaction.atomic():
-                locked_order = WorkOrder.objects.select_for_update().get(
-                    pk=work_order.pk
+                locked_order, error_response = lock_work_order(
+                    request, work_order, WorkOrder.Status.PENDING,
+                    '工单状态已变化，无法撤销。',
                 )
-                if locked_order.status != WorkOrder.Status.PENDING:
-                    messages.error(
-                        request,
-                        '工单状态已变化，无法撤销。',
-                    )
-                    return redirect(
-                        'repair:work_order_detail',
-                        pk=locked_order.pk,
-                    )
+                if error_response:
+                    return error_response
                 locked_order.status = WorkOrder.Status.CANCELLED
                 locked_order.cancel_reason = reason
                 locked_order.save()
@@ -809,8 +830,9 @@ def cancel_order(request, pk):
                     operator=request.user,
                     remark=reason or '学生撤销报修',
                 )
-            messages.success(request, '报修已撤销。')
-            return redirect('repair:work_order_detail', pk=work_order.pk)
+            return redirect_to_work_order(
+                request, work_order, '报修已撤销。', 'success'
+            )
     else:
         form = CancelOrderForm()
 

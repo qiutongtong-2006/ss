@@ -78,10 +78,19 @@ class WorkOrderImageInline(admin.TabularInline):
     readonly_fields = ('uploaded_at',)
 
 
-class RepairRecordInline(admin.TabularInline):
+class ReadOnlyInlineMixin:
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class RepairRecordInline(ReadOnlyInlineMixin, admin.TabularInline):
     model = RepairRecord
     extra = 0
-    can_delete = False
     readonly_fields = (
         'repairer',
         'fault_cause',
@@ -92,31 +101,17 @@ class RepairRecordInline(admin.TabularInline):
     )
     ordering = ('completed_at',)
 
-    def has_add_permission(self, request, obj=None):
-        return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-class StatusLogInline(admin.TabularInline):
+class StatusLogInline(ReadOnlyInlineMixin, admin.TabularInline):
     model = StatusLog
     extra = 0
-    can_delete = False
     readonly_fields = ('from_status', 'to_status', 'operator', 'remark', 'created_at')
     ordering = ('created_at',)
 
-    def has_add_permission(self, request, obj=None):
-        return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-class EvaluationInline(admin.StackedInline):
+class EvaluationInline(ReadOnlyInlineMixin, admin.StackedInline):
     model = Evaluation
     extra = 0
-    can_delete = False
     readonly_fields = (
         'student',
         'rating',
@@ -124,12 +119,6 @@ class EvaluationInline(admin.StackedInline):
         'created_at',
     )
     max_num = 1
-
-    def has_add_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(WorkOrder)

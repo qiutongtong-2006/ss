@@ -1,8 +1,8 @@
 from django import forms
 from django.db.models import Q
 
-from .deadlines import unaccepted_overdue_cutoff
 from .models import Building, RepairCategory, WorkOrder
+from .utils import unaccepted_overdue_cutoff
 
 DEFAULT_ACTIVE_STATUSES = (
     WorkOrder.Status.ASSIGNED,

@@ -3,8 +3,8 @@ from datetime import datetime, time, timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from .deadlines import unaccepted_overdue_cutoff
 from .models import OPEN_WORK_ORDER_STATUSES, WorkOrder
+from .utils import unaccepted_overdue_cutoff
 
 
 REPORT_RANGE_CHOICES = (

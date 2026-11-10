@@ -14,38 +14,7 @@
     <a class="btn btn-outline-primary" href="{% url 'repair:repairer_orders' %}">刷新任务</a>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-6 col-lg">
-        <div class="card section-card text-center h-100">
-            <div class="text-muted small">全部任务</div>
-            <div class="h3 mb-0">{{ summary.total }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-lg">
-        <div class="card section-card text-center h-100">
-            <div class="text-muted small">待接单</div>
-            <div class="h3 mb-0 text-info">{{ summary.assigned }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-lg">
-        <div class="card section-card text-center h-100">
-            <div class="text-muted small">维修中</div>
-            <div class="h3 mb-0 text-primary">{{ summary.repairing }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-lg">
-        <div class="card section-card text-center h-100">
-            <div class="text-muted small">待验收</div>
-            <div class="h3 mb-0 text-dark">{{ summary.pending_acceptance }}</div>
-        </div>
-    </div>
-    <div class="col-6 col-lg">
-        <div class="card section-card text-center h-100">
-            <div class="text-muted small">已完成</div>
-            <div class="h3 mb-0 text-success">{{ summary.completed }}</div>
-        </div>
-    </div>
-</div>
+{% include 'repair/_summary_cards.html' %}
 
 {% include 'repair/_order_filters.html' %}
 

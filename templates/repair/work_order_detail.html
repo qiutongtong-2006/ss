@@ -177,31 +177,11 @@
 
     <div class="col-lg-4">
         <div class="card section-card mb-4">
-            <h2 class="section-title">处理信息</h2>
+            <h2 class="section-title">当前处理信息</h2>
             <div class="info-list">
                 <div class="info-item">
                     <span class="info-label">维修人员</span>
                     <span class="info-value">{{ work_order.repairer.real_name|default:"待分配" }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">受理时间</span>
-                    <span class="info-value">{{ work_order.accepted_at|date:"Y-m-d H:i"|default:"—" }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">派单时间</span>
-                    <span class="info-value">{{ work_order.assigned_at|date:"Y-m-d H:i"|default:"—" }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">开始维修时间</span>
-                    <span class="info-value">{{ work_order.started_at|date:"Y-m-d H:i"|default:"—" }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">最近完工时间</span>
-                    <span class="info-value">{{ work_order.completed_at|date:"Y-m-d H:i"|default:"—" }}</span>
-                </div>
-                <div class="info-item">
-                    <span class="info-label">验收时间</span>
-                    <span class="info-value">{{ work_order.verified_at|date:"Y-m-d H:i"|default:"—" }}</span>
                 </div>
                 {% if work_order.return_count %}
                     <div class="info-item">
